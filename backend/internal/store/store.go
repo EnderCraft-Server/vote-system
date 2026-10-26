@@ -119,6 +119,11 @@ type Admin struct {
 	LastLoginAt  *time.Time
 	LastLoginIP  string
 	CreatedAt    time.Time
+	// TOTPSecret 为空表示尚未绑定 authenticator；绑定后不可自助重绑，
+	// 只能由运维在后台控制台执行 unbind totp <username>。
+	TOTPSecret   string
+	TOTPBoundAt  *time.Time
+	TOTPLastStep int64
 }
 
 type AdminSession struct {
@@ -219,6 +224,10 @@ type Store interface {
 	RecordLoginFailure(ctx context.Context, id int64, lockUntil *time.Time) error
 	RecordLoginSuccess(ctx context.Context, id int64, ip string) error
 	DeleteAdmin(ctx context.Context, id int64) error
+	// 绑定/解绑 authenticator，以及记录已用过的 TOTP 时间步（防重放）。
+	SetAdminTOTP(ctx context.Context, id int64, secret string, at time.Time) error
+	ClearAdminTOTP(ctx context.Context, id int64) error
+	UpdateAdminTOTPStep(ctx context.Context, id int64, step int64) error
 	CreateSession(ctx context.Context, s *AdminSession) error
 	GetSession(ctx context.Context, tokenHash string) (*AdminSession, error)
 	TouchSession(ctx context.Context, tokenHash string, at time.Time) error
