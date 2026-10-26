@@ -3,11 +3,11 @@
 package vote
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/dchest/captcha"
+	"github.com/mojocn/base64Captcha"
 
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/store"
@@ -241,13 +241,11 @@ func (s *Service) CreateCaptcha(ctx context.Context, ipText string) (string, int
 		return "", 0, ErrIPBlocked
 	}
 
-	digits := captcha.RandomDigits(s.cfg.Captcha.Length)
-	id := randomToken(16)
-	img := captcha.NewImage(id, digits, captchaWidth, captchaHeight)
-	var buf bytes.Buffer
-	if _, err := img.WriteTo(&buf); err != nil {
+	png, digits, err := renderCaptcha(s.cfg.Captcha.Length)
+	if err != nil {
 		return "", 0, err
 	}
+	id := randomToken(16)
 	now := s.now()
 	exp := now.Add(s.cfg.Captcha.TTL.Duration)
 
@@ -265,11 +263,11 @@ func (s *Service) CreateCaptcha(ctx context.Context, ipText string) (string, int
 			}
 		}
 	}
-	s.images[id] = cachedImage{png: buf.Bytes(), exp: exp}
+	s.images[id] = cachedImage{png: png, exp: exp}
 	s.mu.Unlock()
 
 	if err := s.st.CreateCaptcha(ctx, &store.Captcha{
-		ID: id, IP: ip, IPText: ipText, AnswerHash: s.captchaHash(id, digits),
+		ID: id, IP: ip, IPText: ipText, AnswerHash: s.captchaHash(id, []byte(digits)),
 		CreatedAt: now, ExpiresAt: exp,
 	}); err != nil {
 		return "", 0, err
@@ -854,6 +852,31 @@ func (s *Service) aggregate(ctx context.Context, p *store.Poll, view PollView, i
 		out.Questions = append(out.Questions, rq)
 	}
 	return out, nil
+}
+
+// captchaStore 是个丢弃实现的 Store：答案由我们自己按 IP 绑定存放，
+// 图片生成库内部那份缓存不需要（也不该）留在内存里。
+type captchaStore struct{}
+
+func (captchaStore) Set(string, string) error         { return nil }
+func (captchaStore) Get(string, bool) string          { return "" }
+func (captchaStore) Verify(string, string, bool) bool { return false }
+
+// renderCaptcha 用 base64Captcha 生成一张"人眼能认"的数字验证码，返回 PNG 与答案。
+// 之前用 dchest/captcha，5 位数字在 320x100 下被扭曲成一团，实测三个人里两个读不出。
+func renderCaptcha(length int) ([]byte, string, error) {
+	driver := base64Captcha.NewDriverDigit(captchaHeight, captchaWidth, length, 0.4, 30)
+	c := base64Captcha.NewCaptcha(driver, captchaStore{})
+	_, b64, answer, err := c.Generate()
+	if err != nil {
+		return nil, "", err
+	}
+	const prefix = "data:image/png;base64,"
+	png, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(b64, prefix))
+	if err != nil {
+		return nil, "", err
+	}
+	return png, answer, nil
 }
 
 // CaptchaSize 让上层（RPC 响应）不用重复写尺寸。
