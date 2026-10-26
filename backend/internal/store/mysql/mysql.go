@@ -410,6 +410,20 @@ func (s *Store) PollIPStats(ctx context.Context, pollID int64, limit int) ([]sto
 	return out, rows.Err()
 }
 
+func (s *Store) CountVotesByIP(ctx context.Context, pollID int64, ip []byte) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM votes WHERE poll_id = ? AND ip = ?", pollID, ip).Scan(&n)
+	return n, err
+}
+
+func (s *Store) DeleteVotesByIP(ctx context.Context, pollID int64, ip []byte) (int64, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM votes WHERE poll_id = ? AND ip = ?", pollID, ip)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (s *Store) CreateCaptcha(ctx context.Context, c *store.Captcha) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO captchas (id, ip, ip_text, answer_hash, attempts, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		c.ID, c.IP, c.IPText, c.AnswerHash, c.Attempts, c.ExpiresAt)

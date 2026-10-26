@@ -19,6 +19,7 @@
     <a href="/ip-rules" {{if eq .Nav "ip"}}class="on"{{end}}>IP 规则</a>
     <a href="/admins" {{if eq .Nav "admins"}}class="on"{{end}}>管理员</a>
     <a href="/audit" {{if eq .Nav "audit"}}class="on"{{end}}>审计</a>
+    <a href="/super/danger" {{if eq .Nav "danger"}}class="on"{{end}}>危险操作</a>
     <a href="/account" {{if eq .Nav "account"}}class="on"{{end}}>账号</a>
   </nav>
   <form method="post" action="/logout" class="logout">

@@ -293,6 +293,35 @@ func (s *Store) PollIPStats(_ context.Context, pollID int64, limit int) ([]store
 	return out, nil
 }
 
+func (s *Store) CountVotesByIP(_ context.Context, pollID int64, ip []byte) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, v := range s.votes[pollID] {
+		if string(v.IP) == string(ip) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (s *Store) DeleteVotesByIP(_ context.Context, pollID int64, ip []byte) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := make([]store.Vote, 0, len(s.votes[pollID]))
+	var removed int64
+	for _, v := range s.votes[pollID] {
+		if string(v.IP) == string(ip) {
+			delete(s.answers, v.ID)
+			removed++
+			continue
+		}
+		kept = append(kept, v)
+	}
+	s.votes[pollID] = kept
+	return removed, nil
+}
+
 func (s *Store) CreateCaptcha(_ context.Context, c *store.Captcha) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
