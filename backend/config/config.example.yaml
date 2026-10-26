@@ -1,0 +1,59 @@
+# Vote 后台配置样例
+# 复制为 config.yaml 后修改；config.yaml 已在 .gitignore 中，不会进仓库。
+# 支持环境变量覆盖：VOTE_RPC_SECRET / VOTE_DB_DSN / VOTE_ENV / VOTE_ADMIN_PASSWORD
+
+env: production            # production | development
+
+server:
+  rpc_listen: "127.0.0.1:7788"        # 只给 PHP 前台用的 TCP RPC，务必监听回环
+  admin_listen: "127.0.0.1:7789"      # 管理界面，建议再套一层 nginx + IP 白名单
+  # 允许访问管理界面的来源网段；留空表示不限制（不推荐）
+  admin_allowed_cidrs:
+    - "127.0.0.1/32"
+    - "::1/128"
+  read_timeout: 15s
+  write_timeout: 15s
+  idle_timeout: 60s
+  max_connections: 256
+  max_frame_bytes: 1048576            # 单帧上限 1 MiB
+
+database:
+  driver: mysql                       # mysql | memory（memory 仅本地调试，重启丢数据）
+  # 例：vote:密码@tcp(127.0.0.1:3306)/vote_system?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai&timeout=5s
+  dsn: "vote:CHANGE_ME@tcp(127.0.0.1:3306)/vote_system?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai&timeout=5s"
+  max_open_conns: 32
+  max_idle_conns: 8
+  conn_max_lifetime: 30m
+
+security:
+  # 与 frontend/config/config.php 的 backend.rpc_secret 必须完全一致。
+  # 生成：openssl rand -hex 32   或者   php -r "echo bin2hex(random_bytes(32));"
+  rpc_secret: "CHANGE_ME_64_HEX_CHARACTERS"
+  rpc_clock_skew: 60s                 # 时间戳允许偏移
+  rpc_nonce_ttl: 300s                 # 防重放窗口
+  admin_session_ttl: 8h
+  admin_idle_timeout: 30m
+  admin_cookie_secure: true           # 生产环境走 HTTPS 时必须为 true
+  admin_login_max_attempts: 5
+  admin_login_lockout: 15m
+  admin_bcrypt_cost: 12
+
+captcha:
+  enabled: true
+  length: 6                           # 验证码位数
+  ttl: 5m                             # 有效期
+  max_attempts: 5                     # 同一验证码最多尝试次数
+  create_per_ip_per_minute: 10         # 每 IP 每分钟可申请次数
+
+limits:
+  vote_per_ip_per_minute: 3           # 每 IP 每分钟提交上限（跨投票）
+  answer_text_max: 300                # 简答题长度上限
+
+demo:
+  seed: false                         # 仅 driver=memory 时有效：写入示例投票
+  admin_username: admin
+  admin_password: ""                  # 留空则随机生成并打印到日志
+
+log:
+  level: info                         # debug | info | warn | error
+  format: text                        # text | json

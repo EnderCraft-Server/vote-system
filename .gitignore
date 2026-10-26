@@ -1,0 +1,26 @@
+# 本地工具链（便携版 Go/PHP，不入库）
+/_tools/
+/_skills/
+/_tmp/
+/notes/
+
+# 运行时配置（含密钥；只提交 *.example.*）
+/backend/config/config.yaml
+/backend/config/config.*.yaml
+!/backend/config/config.example.yaml
+/frontend/config/config.php
+/frontend/config/config.*.php
+!/frontend/config/config.example.php
+
+# 运行时产物
+/backend/bin/
+/backend/data/
+/frontend/storage/logs/*
+!/frontend/storage/logs/.gitkeep
+*.log
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

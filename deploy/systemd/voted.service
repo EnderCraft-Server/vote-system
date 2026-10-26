@@ -1,0 +1,26 @@
+[Unit]
+Description=Vote backend (Go, RPC + admin)
+After=network.target mysql.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=vote
+Group=vote
+WorkingDirectory=/srv/vote-system/backend
+ExecStart=/srv/vote-system/backend/bin/voted -config /etc/vote-system/backend.yaml
+Restart=on-failure
+RestartSec=3
+# 进程内不需要额外权限
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/vote-system
+CapabilityBoundingSet=
+AmbientCapabilities=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
