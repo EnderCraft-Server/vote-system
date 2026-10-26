@@ -252,6 +252,47 @@ func keyOf(v store.Vote) []byte {
 	return v.IP
 }
 
+func (s *Store) PollIPStats(_ context.Context, pollID int64, limit int) ([]store.IPStat, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	type agg struct {
+		text  string
+		n     int
+		first time.Time
+		last  time.Time
+	}
+	byIP := make(map[string]*agg)
+	for _, v := range s.votes[pollID] {
+		key := string(v.IP)
+		a, ok := byIP[key]
+		if !ok {
+			a = &agg{text: v.IPText, first: v.CreatedAt, last: v.CreatedAt}
+			byIP[key] = a
+		}
+		a.n++
+		if v.CreatedAt.Before(a.first) {
+			a.first = v.CreatedAt
+		}
+		if v.CreatedAt.After(a.last) {
+			a.last = v.CreatedAt
+		}
+	}
+	out := make([]store.IPStat, 0, len(byIP))
+	for _, a := range byIP {
+		out = append(out, store.IPStat{IPText: a.text, Votes: a.n, FirstAt: a.first, LastAt: a.last})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Votes == out[j].Votes {
+			return out[i].LastAt.After(out[j].LastAt)
+		}
+		return out[i].Votes > out[j].Votes
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (s *Store) CreateCaptcha(_ context.Context, c *store.Captcha) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

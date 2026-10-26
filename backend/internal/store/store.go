@@ -132,6 +132,14 @@ type AdminSession struct {
 	ExpiresAt  time.Time
 }
 
+// IPStat 是"按 IP 聚合"的一行，用来判断是否有人刷票。
+type IPStat struct {
+	IPText  string
+	Votes   int
+	FirstAt time.Time
+	LastAt  time.Time
+}
+
 type AuditEntry struct {
 	ID        int64
 	Actor     string
@@ -186,6 +194,8 @@ type Store interface {
 	CountVotes(ctx context.Context, pollID int64) (int, error)
 	ListAnswers(ctx context.Context, pollID int64) ([]Answer, error)
 	ListVotes(ctx context.Context, pollID int64, limit int) ([]Vote, error)
+	// PollIPStats 按 IP 聚合该投票的票数，按票数降序。
+	PollIPStats(ctx context.Context, pollID int64, limit int) ([]IPStat, error)
 
 	// 验证码
 	CreateCaptcha(ctx context.Context, c *Captcha) error
