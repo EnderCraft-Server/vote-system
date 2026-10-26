@@ -23,6 +23,7 @@ func testSetup(t *testing.T) (*Server, *vote.Service, *memory.Store, []byte, *st
 	cfg.Env = "development"
 	cfg.Security.RPCSecret = strings.Repeat("k", 48)
 	cfg.Captcha.Enabled = false
+	cfg.Captcha.Pow.Enabled = false
 	cfg.Limits.VotePerIPMinute = 100
 	st := memory.New()
 	poll, err := st.CreatePoll(context.Background(), store.PollInput{

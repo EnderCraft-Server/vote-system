@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/EnderCraft-Server/vote-system/backend/internal/pow"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/protocol"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/vote"
 )
@@ -199,6 +200,15 @@ type captchaCreateBody struct {
 	IP string `json:"ip"`
 }
 
+type powBody struct {
+	Nonce     string `json:"nonce"`
+	Salt      string `json:"salt"`
+	Bits      int    `json:"bits"`
+	Expires   int64  `json:"expires"`
+	Signature string `json:"signature"`
+	Counter   uint64 `json:"counter"`
+}
+
 type captchaImageBody struct {
 	ID string `json:"id"`
 }
@@ -216,6 +226,7 @@ type submitBody struct {
 		ID     string `json:"id"`
 		Answer string `json:"answer"`
 	} `json:"captcha"`
+	Pow     powBody            `json:"pow"`
 	Answers []vote.AnswerInput `json:"answers"`
 }
 
@@ -250,6 +261,17 @@ func (s *Server) call(ctx context.Context, method string, body []byte) (any, err
 			return nil, err
 		}
 		return map[string]any{"id": id, "ttl": ttl}, nil
+
+	case "captcha.challenge":
+		var in captchaCreateBody
+		if err := decode(body, &in); err != nil {
+			return nil, err
+		}
+		c, err := s.svc.PowChallenge(ctx, in.IP)
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
 
 	case "captcha.image":
 		var in captchaImageBody
@@ -304,6 +326,10 @@ func (s *Server) call(ctx context.Context, method string, body []byte) (any, err
 			IP:      in.IP,
 			UA:      in.UA,
 			Captcha: struct{ ID, Answer string }{ID: in.Captcha.ID, Answer: in.Captcha.Answer},
+			Pow: pow.Solution{
+				Nonce: in.Pow.Nonce, Salt: in.Pow.Salt, Bits: in.Pow.Bits,
+				Expires: in.Pow.Expires, Signature: in.Pow.Signature, Counter: in.Pow.Counter,
+			},
 			Answers: in.Answers,
 		})
 		if err != nil {

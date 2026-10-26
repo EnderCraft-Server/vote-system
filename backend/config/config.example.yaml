@@ -39,14 +39,26 @@ security:
   admin_bcrypt_cost: 12
 
 captcha:
-  enabled: true
+  enabled: true                       # 图片验证码（人机判别的"人"那一层）
   length: 4                           # 验证码位数（4~8；图片固定 320x100，5 位以上会明显变糊）
+  # 工作量证明层：图片验证码会被 OCR/多模态模型破解，PoW 没有可识别的语义，
+  # 只能靠算力换答案；再配合"申请越多难度越高"，批量自动化的成本会迅速失控。
+  pow:
+    enabled: true
+    base_bits: 18                     # 初始难度（18 ≈ 26 万次 SHA-256，浏览器约 0.3s）
+    max_bits: 24                      # 上限（24 ≈ 1600 万次；正常用户永远到不了）
+    escalate_every: 3                 # 同一 IP 每申请 3 次，难度 +1 bit
+    ttl: 5m
+    window: 10m
   ttl: 5m                             # 有效期
   max_attempts: 5                     # 同一验证码最多尝试次数
   create_per_ip_per_minute: 10         # 每 IP 每分钟可申请次数
 
 limits:
-  vote_per_ip_per_minute: 3           # 每 IP 每分钟提交上限（跨投票）
+  vote_per_ip_per_minute: 3           # 每 IP 每分钟提交上限（跨投票）；0 = 不限
+  # 一 IP 一票。默认 true（需求硬约束）。只有"验证码抗压测试/演示"才关，
+  # 关掉后同一 IP 可以重复投票，生产环境务必保持 true。
+  one_vote_per_ip: true
   answer_text_max: 300                # 简答题长度上限
 
 demo:

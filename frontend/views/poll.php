@@ -2,6 +2,7 @@
 /** @var array<string,mixed> $poll */
 /** @var array<int,array<string,mixed>> $questions */
 /** @var array<string,mixed>|null $captcha */
+/** @var array<string,mixed>|null $pow */
 /** @var \App\Rpc\RpcException|null $captchaError */
 /** @var string $csrf */
 /** @var string[] $errors */
@@ -147,6 +148,15 @@ $resultsVisible = !empty($poll['results_visible']);
           </section>
         <?php endforeach; ?>
 
+        <?php if ($pow !== null): ?>
+          <section class="pow" data-pow="<?= e(json_encode($pow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>">
+            <h2 class="captcha-title"><?= e(t('pow.title')) ?></h2>
+            <p class="q-note pow-status" data-pow-status aria-live="polite"><?= e(t('pow.pending')) ?></p>
+            <p class="q-note"><?= e(t('pow.hint')) ?></p>
+            <input type="hidden" name="pow_solution" value="">
+          </section>
+        <?php endif; ?>
+
         <section class="captcha" aria-labelledby="captcha-label">
           <h2 class="captcha-title" id="captcha-label"><?= e(t('poll.captcha')) ?></h2>
           <?php if ($captcha !== null): ?>
@@ -171,7 +181,7 @@ $resultsVisible = !empty($poll['results_visible']);
         <div class="actionbar">
           <div class="actionbar-inner">
             <p class="actionbar-note"><?= e(t('poll.submit_note')) ?></p>
-            <button class="btn btn-primary" type="submit"><?= e(t('poll.submit')) ?></button>
+            <button class="btn btn-primary" type="submit" <?= $pow !== null ? 'disabled' : '' ?>><?= e(t('poll.submit')) ?></button>
           </div>
         </div>
       </form>

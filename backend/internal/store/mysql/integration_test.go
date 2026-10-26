@@ -102,7 +102,7 @@ func TestIntegrationVoteAndDuplicate(t *testing.T) {
 
 	ip := make([]byte, 16)
 	ip[0], ip[10], ip[11], ip[12], ip[15] = 0, 0xff, 0xff, 198, 51
-	v := &store.Vote{PollID: poll.ID, IP: ip, IPText: "198.51.100.1", UAHash: "u", Receipt: "IT" + time.Now().Format("150405000")}
+	v := &store.Vote{PollID: poll.ID, IP: ip, IPKey: ip, IPText: "198.51.100.1", UAHash: "u", Receipt: "IT" + time.Now().Format("150405000")}
 	if err := st.InsertVote(ctx, v, []store.Answer{
 		{QuestionID: qs[0].ID, Choices: []int64{qs[0].Options[0].ID}},
 		{QuestionID: qs[0].ID, Text: "中文答案 ✓"},
@@ -114,7 +114,7 @@ func TestIntegrationVoteAndDuplicate(t *testing.T) {
 	}
 
 	// 同 IP 第二次必须冲突
-	v2 := &store.Vote{PollID: poll.ID, IP: ip, IPText: "198.51.100.1", Receipt: "IT" + time.Now().Format("150405001")}
+	v2 := &store.Vote{PollID: poll.ID, IP: ip, IPKey: ip, IPText: "198.51.100.1", Receipt: "IT" + time.Now().Format("150405001")}
 	err = st.InsertVote(ctx, v2, nil)
 	if !errors.Is(err, store.ErrDuplicateVote) {
 		t.Fatalf("期望 ErrDuplicateVote，得到 %v", err)

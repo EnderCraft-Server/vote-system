@@ -67,9 +67,12 @@ type Question struct {
 }
 
 type Vote struct {
-	ID        int64
-	PollID    int64
-	IP        []byte
+	ID     int64
+	PollID int64
+	IP     []byte
+	// IPKey 是唯一键里参与去重的那一列：开启"一 IP 一票"时等于 IP，
+	// 关闭时每票随机，从而实现"同一 IP 可重复投票"。
+	IPKey     []byte
 	IPText    string
 	UAHash    string
 	Receipt   string

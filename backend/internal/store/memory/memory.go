@@ -183,7 +183,7 @@ func (s *Store) HasVoted(_ context.Context, pollID int64, ip []byte) (bool, erro
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, v := range s.votes[pollID] {
-		if string(v.IP) == string(ip) {
+		if string(keyOf(v)) == string(ip) {
 			return true, nil
 		}
 	}
@@ -194,7 +194,7 @@ func (s *Store) InsertVote(_ context.Context, v *store.Vote, answers []store.Ans
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, old := range s.votes[v.PollID] {
-		if string(old.IP) == string(v.IP) {
+		if string(keyOf(old)) == string(keyOf(*v)) {
 			return store.ErrDuplicateVote
 		}
 	}
@@ -242,6 +242,14 @@ func (s *Store) ListVotes(_ context.Context, pollID int64, limit int) ([]store.V
 		out = append(out, src[i])
 	}
 	return out, nil
+}
+
+// keyOf 返回参与去重的列：有 IPKey 用 IPKey，否则退回 IP（兼容老数据）。
+func keyOf(v store.Vote) []byte {
+	if len(v.IPKey) > 0 {
+		return v.IPKey
+	}
+	return v.IP
 }
 
 func (s *Store) CreateCaptcha(_ context.Context, c *store.Captcha) error {

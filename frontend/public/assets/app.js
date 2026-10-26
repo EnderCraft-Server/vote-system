@@ -64,6 +64,65 @@
     update();
   });
 
+  /* ---- 工作量证明 ---- */
+  (function () {
+    var box = document.querySelector("[data-pow]");
+    if (!box) return;
+    var status = box.querySelector("[data-pow-status]");
+    var field = box.querySelector('input[name="pow_solution"]');
+    var submit = document.querySelector('form.vote-form button[type="submit"]');
+    var challenge;
+    try { challenge = JSON.parse(box.getAttribute("data-pow") || "{}"); } catch (e) { challenge = null; }
+    if (!challenge || !challenge.salt) return;
+
+    function setStatus(text, isError) {
+      if (!status) return;
+      status.textContent = text;
+      status.setAttribute("data-state", isError ? "error" : "ok");
+    }
+
+    function enableSubmit() {
+      if (submit) submit.disabled = false;
+    }
+
+    if (!window.Worker || !window.crypto || !crypto.subtle) {
+      setStatus("浏览器不支持人机校验，请换用较新的浏览器。", true);
+      return;
+    }
+
+    var worker;
+    try {
+      worker = new Worker("/assets/pow-worker.js");
+    } catch (e) {
+      setStatus("人机校验启动失败，请刷新页面重试。", true);
+      return;
+    }
+    worker.onmessage = function (event) {
+      var msg = event.data || {};
+      if (msg.progress !== undefined) {
+        var pct = Math.min(99, Math.floor((msg.progress / Math.pow(2, challenge.bits)) * 100));
+        setStatus("正在校验浏览器… " + pct + "%", false);
+        return;
+      }
+      if (msg.ok) {
+        field.value = JSON.stringify({
+          nonce: challenge.nonce, salt: challenge.salt, bits: challenge.bits,
+          expires: challenge.expires, signature: challenge.signature, counter: msg.counter
+        });
+        setStatus("校验通过，可以提交了。", false);
+        enableSubmit();
+        worker.terminate();
+      } else {
+        setStatus("人机校验失败，请刷新页面重试。", true);
+      }
+    };
+    worker.onerror = function () {
+      setStatus("人机校验失败，请刷新页面重试。", true);
+    };
+    setStatus("正在校验浏览器… 0%", false);
+    worker.postMessage({ salt: challenge.salt, bits: challenge.bits });
+  })();
+
   /* ---- 防重复提交 ---- */
   document.querySelectorAll("form.vote-form").forEach(function (form) {
     form.addEventListener("submit", function () {
