@@ -73,7 +73,9 @@ final class PollController
             return;
         }
         if (empty($poll['can_vote'])) {
-            $this->rerender($slug, $poll, $questions, 'err.poll_closed', $old, 403);
+            // 已经投过票和"投票已结束"是两件不同的事，提示不能混：前者 409，后者 403。
+            $already = !empty($poll['has_voted']);
+            $this->rerender($slug, $poll, $questions, $already ? 'err.already_voted' : 'err.poll_closed', $old, $already ? 409 : 403);
             return;
         }
 
