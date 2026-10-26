@@ -80,6 +80,7 @@ mac = HMAC_SHA256(key = rpc_secret 的 UTF-8 字节, data = payload 去掉末尾
   "ip": "1.2.3.4",
   "ua": "Mozilla/5.0 …",
   "captcha": {"id": "Vt3x…", "answer": "482915"},
+  "pow": {"nonce": "…", "salt": "…", "bits": 18, "expires": 1793018602, "signature": "…", "counter": 151996},
   "answers": [
     {"question_id": 3, "choices": [11]},
     {"question_id": 4, "choices": [21, 22]},
@@ -88,6 +89,21 @@ mac = HMAC_SHA256(key = rpc_secret 的 UTF-8 字节, data = payload 去掉末尾
   ]
 }
 ```
+
+## 工作量证明（captcha.challenge）
+
+`captcha.challenge` 返回的字段全部被 HMAC 签名覆盖（`pow|nonce|salt|bits|expires|ip`），
+所以客户端既不能改难度，也不能换 IP 复用：
+
+``text
+digest = sha256(salt + ":" + counter)      # counter 是十进制字符串
+通过条件 = digest 的前导零比特数 >= bits
+``
+
+- 服务端校验：签名、`expires`、`base_bits <= bits <= max_bits`、nonce 未被使用过、工作量达标。
+- 难度按 IP 逐级上升：同一 IP 在 `window` 内每申请 `escalate_every` 次，bits +1，上限 `max_bits`。
+- 挑战与解都是一次性的；重放会返回 `captcha_expired`。
+- 前端在 Web Worker 里求解（`public/assets/pow-worker.js`），默认 18 bit 约 0.3~1 秒。
 
 ## 错误码
 

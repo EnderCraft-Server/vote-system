@@ -273,11 +273,15 @@ func (s *Store) InsertVote(ctx context.Context, v *store.Vote, answers []store.A
 	}
 	defer tx.Rollback()
 
-	res, err := tx.ExecContext(ctx, "INSERT INTO votes (poll_id, ip, ip_text, ua_hash, receipt) VALUES (?, ?, ?, ?, ?)",
-		v.PollID, v.IP, v.IPText, v.UAHash, v.Receipt)
+	ipKey := v.IPKey
+	if len(ipKey) == 0 {
+		ipKey = v.IP
+	}
+	res, err := tx.ExecContext(ctx, "INSERT INTO votes (poll_id, ip, ip_key, ip_text, ua_hash, receipt) VALUES (?, ?, ?, ?, ?, ?)",
+		v.PollID, v.IP, ipKey, v.IPText, v.UAHash, v.Receipt)
 	if err != nil {
 		if msg, dup := isDup(err); dup {
-			if strings.Contains(msg, "uk_votes_poll_ip") {
+			if strings.Contains(msg, "uk_votes_poll_ipkey") {
 				return store.ErrDuplicateVote
 			}
 			return store.ErrConflict

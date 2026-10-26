@@ -20,6 +20,7 @@ import (
 	"github.com/mojocn/base64Captcha"
 
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
+	"github.com/EnderCraft-Server/vote-system/backend/internal/pow"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/store"
 )
 
@@ -74,6 +75,7 @@ type Service struct {
 	buckets map[string]*bucket
 	images  map[string]cachedImage
 	secret  []byte
+	pow     *pow.Verifier
 }
 
 type bucket struct {
@@ -94,8 +96,12 @@ func New(st store.Store, cfg *config.Config) *Service {
 		buckets: make(map[string]*bucket),
 		images:  make(map[string]cachedImage),
 		secret:  []byte(cfg.Security.RPCSecret),
+		pow:     pow.New(cfg.Captcha, []byte(cfg.Security.RPCSecret)),
 	}
 }
+
+// oneVotePerIP 表示是否执行"每个 IP 只能投票一次"。
+func (s *Service) oneVotePerIP() bool { return s.cfg.Limits.OneVotePerIP }
 
 // SetClock 只在测试里用，避免测试里 sleep。
 func (s *Service) SetClock(fn func() time.Time) { s.now = fn }
@@ -393,7 +399,19 @@ type SubmitInput struct {
 	IP      string
 	UA      string
 	Captcha struct{ ID, Answer string }
+	Pow     pow.Solution
 	Answers []AnswerInput
+}
+
+// PowChallenge 为某个 IP 签一张工作量证明挑战。
+func (s *Service) PowChallenge(ctx context.Context, ipText string) (pow.Challenge, error) {
+	if !s.cfg.Captcha.Pow.Enabled {
+		return pow.Challenge{}, errf("captcha_disabled", "人机验证未启用")
+	}
+	if _, _, err := parseIP(ipText); err != nil {
+		return pow.Challenge{}, err
+	}
+	return s.pow.Issue(ipText)
 }
 
 type AnswerInput struct {
@@ -488,7 +506,7 @@ func (s *Service) GetPoll(ctx context.Context, slug, ipText string) (*PollDetail
 	}
 	_, ipb, ipErr := parseIP(ipText)
 	hasVoted := false
-	if ipErr == nil {
+	if ipErr == nil && s.oneVotePerIP() {
 		hasVoted, err = s.st.HasVoted(ctx, p.ID, ipb)
 		if err != nil {
 			return nil, err
@@ -683,16 +701,35 @@ func (s *Service) Submit(ctx context.Context, in SubmitInput) (*SubmitResult, er
 		return nil, ErrPollClosed
 	}
 
-	hasVoted, err := s.st.HasVoted(ctx, p.ID, ip)
-	if err != nil {
-		return nil, err
-	}
-	if hasVoted {
-		return nil, ErrAlreadyVoted
+	enforceOneVote := s.oneVotePerIP()
+	var ipKey []byte
+	if enforceOneVote {
+		hasVoted, err := s.st.HasVoted(ctx, p.ID, ip)
+		if err != nil {
+			return nil, err
+		}
+		if hasVoted {
+			return nil, ErrAlreadyVoted
+		}
+		ipKey = ip
+	} else {
+		// 关闭"一 IP 一票"时每票一个随机 key，唯一键依然兜底并发写入。
+		ipKey = make([]byte, 16)
+		if _, err := rand.Read(ipKey); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.verifyCaptcha(ctx, in.Captcha.ID, in.Captcha.Answer, in.IP, ip); err != nil {
 		return nil, err
+	}
+	if s.cfg.Captcha.Pow.Enabled {
+		if err := s.pow.Verify(in.Pow, in.IP); err != nil {
+			if errors.Is(err, pow.ErrExpired) || errors.Is(err, pow.ErrReplay) {
+				return nil, ErrCaptchaExpired
+			}
+			return nil, ErrCaptchaInvalid
+		}
 	}
 
 	qs, err := s.st.ListQuestions(ctx, p.ID)
@@ -712,7 +749,7 @@ func (s *Service) Submit(ctx context.Context, in SubmitInput) (*SubmitResult, er
 
 	for attempt := 0; attempt < 3; attempt++ {
 		v := &store.Vote{
-			PollID: p.ID, IP: ip, IPText: in.IP,
+			PollID: p.ID, IP: ip, IPKey: ipKey, IPText: in.IP,
 			UAHash: uaHash, Receipt: newReceipt(),
 		}
 		err = s.st.InsertVote(ctx, v, answers)
@@ -743,7 +780,7 @@ func (s *Service) Results(ctx context.Context, slug, ipText string) (*ResultSet,
 	}
 	_, ipb, ipErr := parseIP(ipText)
 	hasVoted := false
-	if ipErr == nil {
+	if ipErr == nil && s.oneVotePerIP() {
 		hasVoted, err = s.st.HasVoted(ctx, p.ID, ipb)
 		if err != nil {
 			return nil, err

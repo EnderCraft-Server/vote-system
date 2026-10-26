@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
+	"github.com/EnderCraft-Server/vote-system/backend/internal/pow"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/store"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/store/memory"
 )
@@ -19,6 +20,7 @@ func testConfig() *config.Config {
 	cfg.Env = "development"
 	cfg.Security.RPCSecret = strings.Repeat("s", 48)
 	cfg.Captcha.Enabled = true
+	cfg.Captcha.Pow.Enabled = false
 	cfg.Captcha.TTL = config.Duration{Duration: 5 * time.Minute}
 	cfg.Captcha.MaxAttempts = 3
 	cfg.Captcha.CreatePerIPMinute = 100
@@ -156,6 +158,107 @@ func TestCreateCaptchaReturnsUsablePNG(t *testing.T) {
 	}
 	if len(row.AnswerHash) != 64 {
 		t.Fatalf("AnswerHash 长度 = %d，应为 sha256 十六进制", len(row.AnswerHash))
+	}
+}
+
+func TestPowGate(t *testing.T) {
+	f := newFixture(t, func(c *config.Config) {
+		c.Captcha.Pow.Enabled = true
+		c.Captcha.Pow.BaseBits = 10
+		c.Captcha.Pow.MaxBits = 12
+		c.Captcha.Pow.EscalateEvery = 3
+	})
+	ctx := context.Background()
+	ip := "203.0.113.70"
+
+	// 1) 不带 PoW 解 → 拒绝
+	capID := f.seedCaptcha(t, ip, "123321")
+	_, err := f.svc.Submit(ctx, SubmitInput{
+		Slug: f.poll.Slug, IP: ip,
+		Captcha: struct{ ID, Answer string }{ID: capID, Answer: "123321"},
+		Answers: f.validAnswers(),
+	})
+	if !errors.Is(err, ErrCaptchaInvalid) {
+		t.Fatalf("缺 PoW 时应拒绝，得到 %v", err)
+	}
+
+	// 2) 正确求解 → 通过
+	ch, err := f.svc.PowChallenge(ctx, ip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ch.Bits < 10 || ch.Bits > 12 {
+		t.Fatalf("难度应在 10~12，实际 %d", ch.Bits)
+	}
+	counter, ok := pow.Solve(ch)
+	if !ok {
+		t.Fatal("求解失败")
+	}
+	capID = f.seedCaptcha(t, ip, "123321")
+	_, err = f.svc.Submit(ctx, SubmitInput{
+		Slug: f.poll.Slug, IP: ip,
+		Captcha: struct{ ID, Answer string }{ID: capID, Answer: "123321"},
+		Pow:     pow.Solution{Nonce: ch.Nonce, Salt: ch.Salt, Bits: ch.Bits, Expires: ch.Expires, Signature: ch.Signature, Counter: counter},
+		Answers: f.validAnswers(),
+	})
+	if err != nil {
+		t.Fatalf("正确解应通过：%v", err)
+	}
+
+	// 3) 同一个解重放（换 IP）→ 拒绝
+	capID = f.seedCaptcha(t, "203.0.113.71", "123321")
+	_, err = f.svc.Submit(ctx, SubmitInput{
+		Slug: f.poll.Slug, IP: "203.0.113.71",
+		Captcha: struct{ ID, Answer string }{ID: capID, Answer: "123321"},
+		Pow:     pow.Solution{Nonce: ch.Nonce, Salt: ch.Salt, Bits: ch.Bits, Expires: ch.Expires, Signature: ch.Signature, Counter: counter},
+		Answers: f.validAnswers(),
+	})
+	if !errors.Is(err, ErrCaptchaExpired) && !errors.Is(err, ErrCaptchaInvalid) {
+		t.Fatalf("重放应被拒绝，得到 %v", err)
+	}
+
+	// 4) 难度逐级上升
+	for i := 0; i < 6; i++ {
+		_, _ = f.svc.PowChallenge(ctx, ip)
+	}
+	next, err := f.svc.PowChallenge(ctx, ip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Bits <= ch.Bits {
+		t.Fatalf("多次申请后难度应上升：%d → %d", ch.Bits, next.Bits)
+	}
+}
+
+func TestOneVotePerIPDisabledAllowsRepeat(t *testing.T) {
+	f := newFixture(t, func(c *config.Config) { c.Limits.OneVotePerIP = false; c.Limits.VotePerIPMinute = 100 })
+	ctx := context.Background()
+	ip := "203.0.113.60"
+	for i := 0; i < 3; i++ {
+		id := f.seedCaptcha(t, ip, "123123")
+		_, err := f.svc.Submit(ctx, SubmitInput{
+			Slug: f.poll.Slug, IP: ip,
+			Captcha: struct{ ID, Answer string }{ID: id, Answer: "123123"},
+			Answers: f.validAnswers(),
+		})
+		if err != nil {
+			t.Fatalf("第 %d 票应被接受（开关已关闭）：%v", i+1, err)
+		}
+	}
+	count, err := f.svc.st.CountVotes(ctx, f.poll.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 3 {
+		t.Fatalf("应记录 3 票，实际 %d", count)
+	}
+	// 页面上也应重新出现表单（can_vote=true）
+	detail, err := f.svc.GetPoll(ctx, f.poll.Slug, ip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Poll.HasVoted || !detail.Poll.CanVote {
+		t.Fatalf("关闭开关后不应再标记已投票：%+v", detail.Poll)
 	}
 }
 

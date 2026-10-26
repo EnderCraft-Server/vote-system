@@ -74,12 +74,27 @@ type Captcha struct {
 	TTL               Duration `yaml:"ttl"`
 	MaxAttempts       int      `yaml:"max_attempts"`
 	CreatePerIPMinute int      `yaml:"create_per_ip_per_minute"`
+	// Pow 是"工作量证明"层：没有可被 OCR/多模态模型识别的语义，
+	// 只把每次提交的代价变成可度量的 CPU 工作量，并按申请次数逐级加码。
+	Pow Pow `yaml:"pow"`
+}
+
+type Pow struct {
+	Enabled       bool     `yaml:"enabled"`
+	BaseBits      int      `yaml:"base_bits"`
+	MaxBits       int      `yaml:"max_bits"`
+	EscalateEvery int      `yaml:"escalate_every"`
+	TTL           Duration `yaml:"ttl"`
+	Window        Duration `yaml:"window"`
 }
 
 type Limits struct {
 	VotePerIPMinute int    `yaml:"vote_per_ip_per_minute"`
 	AnswerTextMax   int    `yaml:"answer_text_max"`
 	IPDefaultAction string `yaml:"ip_default_action"`
+	// OneVotePerIP 对应需求里的"每个 IP 只能投票一次"。默认 true；
+	// 只有压力测试/演示需要"同一 IP 连投"时才关，生产必须保持 true。
+	OneVotePerIP bool `yaml:"one_vote_per_ip"`
 }
 
 type Demo struct {
@@ -128,11 +143,20 @@ func Default() *Config {
 			TTL:               Duration{5 * time.Minute},
 			MaxAttempts:       3,
 			CreatePerIPMinute: 10,
+			Pow: Pow{
+				Enabled:       true,
+				BaseBits:      18,
+				MaxBits:       24,
+				EscalateEvery: 3,
+				TTL:           Duration{5 * time.Minute},
+				Window:        Duration{10 * time.Minute},
+			},
 		},
 		Limits: Limits{
 			VotePerIPMinute: 3,
 			AnswerTextMax:   300,
 			IPDefaultAction: "allow",
+			OneVotePerIP:    true,
 		},
 		Demo: Demo{AdminUsername: "admin"},
 		Log:  Log{Level: "info", Format: "text"},
@@ -230,6 +254,17 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Captcha.Pow.Enabled {
+		if c.Captcha.Pow.BaseBits < 10 || c.Captcha.Pow.BaseBits > 28 {
+			add("captcha.pow.base_bits 需在 10~28 之间（18 ≈ 26 万次哈希，浏览器约 0.3s）")
+		}
+		if c.Captcha.Pow.MaxBits < c.Captcha.Pow.BaseBits || c.Captcha.Pow.MaxBits > 32 {
+			add("captcha.pow.max_bits 需在 base_bits~32 之间")
+		}
+		if c.Captcha.Pow.EscalateEvery < 1 {
+			add("captcha.pow.escalate_every 至少为 1")
+		}
+	}
 	if c.Security.AdminBcryptCost < 10 || c.Security.AdminBcryptCost > 15 {
 		add("security.admin_bcrypt_cost 需在 10~15 之间")
 	}

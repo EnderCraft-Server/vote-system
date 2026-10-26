@@ -25,8 +25,12 @@ final class PollController
 
         $poll = is_array($detail['poll'] ?? null) ? $detail['poll'] : [];
         $questions = is_array($detail['questions'] ?? null) ? $detail['questions'] : [];
+        $pow = null;
         $captcha = null;
         $captchaError = null;
+        if (!empty($poll['can_vote'])) {
+            $pow = $this->fetchPow($ip);
+        }
         if (!empty($poll['can_vote']) && (bool)Bootstrap::cfg('captcha.enabled', true)) {
             try {
                 $captcha = (new Client())->call('captcha.create', ['ip' => $ip]);
@@ -42,6 +46,7 @@ final class PollController
             'questions' => $questions,
             'captcha' => $captcha,
             'captchaError' => $captchaError,
+            'pow' => $pow,
             'csrf' => Csrf::issue('vote:' . $slug),
             'errors' => [],
             'old' => [],
@@ -67,6 +72,7 @@ final class PollController
             'captcha_answer' => is_string($_POST['captcha_answer'] ?? null) ? trim((string)$_POST['captcha_answer']) : '',
             'captcha_id' => is_string($_POST['captcha_id'] ?? null) ? (string)$_POST['captcha_id'] : '',
         ];
+        $powSolution = $this->decodePow($_POST['pow_solution'] ?? null);
 
         if (!Csrf::verify(is_string($_POST['csrf'] ?? null) ? (string)$_POST['csrf'] : null, 'vote:' . $slug)) {
             $this->rerender($slug, $poll, $questions, 'err.csrf', [], 400);
@@ -87,6 +93,8 @@ final class PollController
                 'id' => $old['captcha_id'],
                 'answer' => $old['captcha_answer'],
             ],
+            // 工作量证明的解；后台会校验签名、有效期、难度与重放
+            'pow' => $powSolution === null ? new \stdClass() : $powSolution,
             'answers' => $this->toPayload($questions, $old['answers']),
         ];
 
@@ -133,6 +141,45 @@ final class PollController
             'result' => $data,
             'justVoted' => isset($_GET['voted']),
         ]);
+    }
+
+    /** 向后台申请一张工作量证明挑战；后台未启用时返回 null。 */
+    private function fetchPow(string $ip): ?array
+    {
+        try {
+            $data = (new Client())->call('captcha.challenge', ['ip' => $ip]);
+            return is_array($data) && isset($data['salt']) ? $data : null;
+        } catch (RpcException $e) {
+            if ($e->rpcCode !== 'captcha_disabled') {
+                Log::warn('申请工作量证明失败：' . $e->getMessage());
+            }
+            return null;
+        }
+    }
+
+    /** @return array<string,mixed>|null */
+    private function decodePow(mixed $raw): ?array
+    {
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return null;
+        }
+        foreach (['nonce', 'salt', 'bits', 'expires', 'signature', 'counter'] as $k) {
+            if (!array_key_exists($k, $data)) {
+                return null;
+            }
+        }
+        return [
+            'nonce' => (string)$data['nonce'],
+            'salt' => (string)$data['salt'],
+            'bits' => (int)$data['bits'],
+            'expires' => (int)$data['expires'],
+            'signature' => (string)$data['signature'],
+            'counter' => (int)$data['counter'],
+        ];
     }
 
     /** @param array<int,array<string,mixed>> $questions @return array<int,array<string,mixed>> */
@@ -218,6 +265,12 @@ final class PollController
     /** @param array<string,mixed> $poll @param array<int,array<string,mixed>> $questions @param array<string,mixed> $old */
     private function rerender(string $slug, array $poll, array $questions, string $errorKey, array $old, int $status): void
     {
+        $pow = null;
+        try {
+            $pow = (new Client())->call('captcha.challenge', ['ip' => ClientIp::resolve()]);
+        } catch (RpcException $e) {
+            Log::warn('重新签发工作量证明失败：' . $e->getMessage());
+        }
         $captcha = null;
         try {
             $captcha = (new Client())->call('captcha.create', ['ip' => ClientIp::resolve()]);
@@ -230,6 +283,7 @@ final class PollController
             'questions' => $questions,
             'captcha' => $captcha,
             'captchaError' => $captcha === null ? new RpcException('captcha_invalid') : null,
+            'pow' => $pow,
             'csrf' => Csrf::issue('vote:' . $slug),
             'errors' => [$errorKey],
             'old' => $old,

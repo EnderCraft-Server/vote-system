@@ -336,6 +336,12 @@ h1 {
 .btn-icon:hover { color: var(--ink); border-color: var(--rule); background: var(--paper); }
 .btn-icon:disabled { opacity: .35; cursor: default; }
 
+/* ---------- 工作量证明 ---------- */
+.pow { padding: 20px 0 6px; border-top: 1px solid var(--rule-2); margin-top: 8px; }
+.pow-status { color: var(--ink-2); }
+.pow-status[data-state="error"] { color: var(--stamp); }
+.pow-status[data-state="ok"]::before { content: "✓ "; color: var(--ok); }
+
 /* ---------- 验证码 ---------- */
 .captcha { padding: 26px 0 6px; border-top: 1px solid var(--rule-2); margin-top: 8px; }
 .captcha-title { font-size: 15px; font-family: var(--sans); font-weight: 600; margin: 0 0 12px; letter-spacing: .02em; }
