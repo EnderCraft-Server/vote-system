@@ -1,0 +1,26 @@
+{{define "audit.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>审计日志</h1></div>
+  <p class="muted">记录登录、投票/题目变更、IP 规则与管理员操作，最多显示最近 300 条。</p>
+  <table class="table compact">
+    <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th><th>来源 IP</th><th>说明</th></tr></thead>
+    <tbody>
+    {{range .Data.Logs}}
+      <tr>
+        <td class="mono">{{fmtDateTime .CreatedAt}}</td>
+        <td>{{.Actor}}</td>
+        <td class="mono">{{.Action}}</td>
+        <td class="mono">{{.Target}}</td>
+        <td class="mono">{{.IPText}}</td>
+        <td class="muted">{{if .Detail}}{{.Detail}}{{else}}—{{end}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6" class="empty">暂无记录</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</main>
+{{template "foot" .}}
+{{end}}

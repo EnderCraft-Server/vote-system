@@ -1,0 +1,58 @@
+{{define "dashboard.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head">
+    <h1>投票</h1>
+    <a class="btn-primary" href="/polls/new">新建投票</a>
+  </div>
+
+  <section class="stats">
+    <div class="stat"><span class="stat-num">{{len .Data.Polls}}</span><span class="stat-label">投票总数</span></div>
+    <div class="stat"><span class="stat-num">{{.Data.TotalVotes}}</span><span class="stat-label">累计票数</span></div>
+  </section>
+
+  <table class="table">
+    <thead>
+      <tr><th>标题</th><th>标识</th><th>状态</th><th class="num">题目</th><th class="num">票数</th><th>更新时间</th><th class="acts">操作</th></tr>
+    </thead>
+    <tbody>
+    {{range .Data.Polls}}
+      <tr>
+        <td><a href="/polls/{{.Poll.ID}}">{{.Poll.Title}}</a></td>
+        <td class="mono">{{.Poll.Slug}}</td>
+        <td><span class="tag tag-{{.Poll.Status}}">{{zhStatus .Poll.Status}}</span>{{if and (eq .Poll.Status "open") (not .IsOpen)}} <span class="tag tag-warn">不在时间段</span>{{end}}</td>
+        <td class="num">{{.Questions}}</td>
+        <td class="num">{{.VoteCount}}</td>
+        <td class="muted">{{fmtDateTime .Poll.UpdatedAt}}</td>
+        <td class="acts">
+          <a class="btn-quiet" href="/polls/{{.Poll.ID}}/results">结果</a>
+          <form method="post" action="/polls/{{.Poll.ID}}/status" class="inline">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            {{if eq .Poll.Status "open"}}
+              <input type="hidden" name="status" value="closed">
+              <button class="btn-quiet" type="submit">结束</button>
+            {{else}}
+              <input type="hidden" name="status" value="open">
+              <button class="btn-quiet" type="submit">开始</button>
+            {{end}}
+          </form>
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="7" class="empty">还没有投票。点右上角"新建投票"开始。</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+
+  <h2 class="section-title">最近操作</h2>
+  <ul class="feed">
+    {{range .Data.RecentAudit}}
+      <li><span class="muted mono">{{fmtDateTime .CreatedAt}}</span> {{.Actor}} · <span class="mono">{{.Action}}</span> {{.Target}}</li>
+    {{else}}
+      <li class="empty">暂无记录</li>
+    {{end}}
+  </ul>
+</main>
+{{template "foot" .}}
+{{end}}

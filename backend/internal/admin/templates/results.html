@@ -1,0 +1,72 @@
+{{define "results.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+{{with .Data}}
+<main class="page">
+  <div class="page-head">
+    <h1>结果 · {{.Poll.Title}}</h1>
+    <div class="head-acts">
+      <a class="btn-quiet" href="/polls/{{.Poll.ID}}">编辑投票</a>
+      <a class="btn-quiet" href="/">返回列表</a>
+    </div>
+  </div>
+
+  <section class="stats">
+    <div class="stat"><span class="stat-num">{{.Result.TotalVotes}}</span><span class="stat-label">有效票</span></div>
+    <div class="stat"><span class="stat-num">{{len .Result.Questions}}</span><span class="stat-label">题目</span></div>
+    <div class="stat"><span class="stat-num">{{zhStatus .Poll.Status}}</span><span class="stat-label">状态</span></div>
+  </section>
+
+  {{range .Result.Questions}}
+  <section class="card">
+    <div class="card-head">
+      <h2>{{.Title}}</h2>
+      <span class="muted small">{{zhType .Type}} · {{.TotalResponses}} 份回答</span>
+    </div>
+
+    {{if eq .Type "text"}}
+      {{if .Texts}}
+        <ul class="texts">
+          {{range .Texts}}<li>{{.}}</li>{{end}}
+        </ul>
+      {{else}}
+        <p class="muted">暂无文字回答。</p>
+      {{end}}
+    {{else if eq .Type "rank"}}
+      <table class="table compact">
+        <thead><tr><th>条目</th><th class="num">平均名次</th><th class="num">排第一的次数</th></tr></thead>
+        <tbody>
+        {{range .Options}}
+          <tr><td>{{.Label}}</td><td class="num">{{fmtRank .AvgRank}}</td><td class="num">{{.FirstPlace}}</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      {{range .Options}}
+        <div class="bar-row">
+          <span class="bar-label">{{.Label}}</span>
+          <div class="bar"><span style="width: {{percent .Percent}}%"></span></div>
+          <span class="bar-num">{{.Count}} · {{percent .Percent}}%</span>
+        </div>
+      {{end}}
+    {{end}}
+  </section>
+  {{end}}
+
+  <section class="card">
+    <div class="card-head"><h2>最近投票</h2><span class="muted small">最多显示 100 条</span></div>
+    <table class="table compact">
+      <thead><tr><th>时间</th><th>IP</th><th>回执</th></tr></thead>
+      <tbody>
+      {{range .Votes}}
+        <tr><td class="mono">{{fmtDateTime .CreatedAt}}</td><td class="mono">{{.IPText}}</td><td class="mono">{{.Receipt}}</td></tr>
+      {{else}}
+        <tr><td colspan="3" class="empty">还没有票</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+</main>
+{{end}}
+{{template "foot" .}}
+{{end}}

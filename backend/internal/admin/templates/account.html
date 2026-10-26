@@ -1,0 +1,34 @@
+{{define "account.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>账号</h1></div>
+
+  <section class="card">
+    <h2>当前账号</h2>
+    <dl class="kv">
+      <dt>用户名</dt><dd class="mono">{{.Admin.Username}}</dd>
+      <dt>上次登录</dt><dd>{{fmtOpt .Admin.LastLoginAt}}</dd>
+      <dt>上次登录 IP</dt><dd class="mono">{{if .Admin.LastLoginIP}}{{.Admin.LastLoginIP}}{{else}}—{{end}}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>修改密码</h2>
+    <form method="post" action="/account/password" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>当前密码
+        <input type="password" name="current" autocomplete="current-password" required maxlength="128">
+      </label>
+      <label>新密码（至少 12 位）
+        <input type="password" name="next" autocomplete="new-password" required minlength="12" maxlength="128">
+      </label>
+      <label>再输入一次
+        <input type="password" name="confirm" autocomplete="new-password" required minlength="12" maxlength="128">
+      </label>
+      <div class="form-acts"><button type="submit" class="btn-primary">更新密码</button></div>
+    </form>
+  </section>
+</main>
+{{template "foot" .}}
+{{end}}

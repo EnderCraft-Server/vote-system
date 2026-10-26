@@ -1,0 +1,51 @@
+{{define "admins.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>管理员</h1></div>
+
+  <section class="card">
+    <h2>新增管理员</h2>
+    <form method="post" action="/admins" class="inline-form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>用户名
+        <input type="text" name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+">
+      </label>
+      <label>显示名
+        <input type="text" name="display_name" maxlength="64">
+      </label>
+      <label>初始密码（至少 12 位）
+        <input type="password" name="password" required minlength="12" maxlength="128" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn-primary">创建</button>
+    </form>
+  </section>
+
+  <table class="table">
+    <thead><tr><th>用户名</th><th>显示名</th><th>状态</th><th>上次登录</th><th class="acts">操作</th></tr></thead>
+    <tbody>
+    {{range .Data.Admins}}
+      <tr>
+        <td class="mono">{{.Username}}</td>
+        <td>{{if .DisplayName}}{{.DisplayName}}{{else}}—{{end}}</td>
+        <td>{{if .Active}}<span class="tag tag-open">正常</span>{{else}}<span class="tag tag-closed">已停用</span>{{end}}</td>
+        <td class="muted">{{fmtOpt .LastLoginAt}} {{if .LastLoginIP}}<span class="mono">({{.LastLoginIP}})</span>{{end}}</td>
+        <td class="acts">
+          <form method="post" action="/admins/{{.ID}}/toggle" class="inline">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <button type="submit" class="btn-quiet">{{if .Active}}停用{{else}}启用{{end}}</button>
+          </form>
+          <form method="post" action="/admins/{{.ID}}/delete" class="inline" onsubmit="return confirm('确定删除该管理员？');">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <button type="submit" class="btn-quiet">删除</button>
+          </form>
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="5" class="empty">没有管理员</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</main>
+{{template "foot" .}}
+{{end}}

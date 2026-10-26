@@ -1,0 +1,39 @@
+{{define "head"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Title}} · 投票系统后台</title>
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+{{end}}
+
+{{define "nav"}}
+<header class="topbar">
+  <a class="brand" href="/">投票系统<span class="brand-sub">后台</span></a>
+  <nav class="nav">
+    <a href="/" {{if eq .Nav "dashboard"}}class="on"{{end}}>投票</a>
+    <a href="/ip-rules" {{if eq .Nav "ip"}}class="on"{{end}}>IP 规则</a>
+    <a href="/admins" {{if eq .Nav "admins"}}class="on"{{end}}>管理员</a>
+    <a href="/audit" {{if eq .Nav "audit"}}class="on"{{end}}>审计</a>
+    <a href="/account" {{if eq .Nav "account"}}class="on"{{end}}>账号</a>
+  </nav>
+  <form method="post" action="/logout" class="logout">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <span class="who">{{if .Admin}}{{.Admin.Username}}{{end}}</span>
+    <button type="submit" class="btn-quiet">退出</button>
+  </form>
+</header>
+{{if .Flash}}<p class="flash" role="status">{{.Flash}}</p>{{end}}
+{{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+{{end}}
+
+{{define "foot"}}
+</main>
+<footer class="foot">后台与管理界面同源，公众站点请访问前台域名。</footer>
+</body>
+</html>
+{{end}}
