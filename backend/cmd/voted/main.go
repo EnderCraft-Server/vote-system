@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/EnderCraft-Server/vote-system/backend/internal/admin"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/demo"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/logx"
@@ -84,6 +85,24 @@ func main() {
 	errCh := make(chan error, 1)
 	go func() { errCh <- rpcServer.Serve(ln) }()
 
+	adminServer, err := admin.New(cfg, st, svc, log.With("component", "admin"))
+	if err != nil {
+		log.Error("初始化管理界面失败", "err", err)
+		os.Exit(1)
+	}
+	adminLn, err := net.Listen("tcp", cfg.Server.AdminListen)
+	if err != nil {
+		log.Error("监听管理端口失败", "addr", cfg.Server.AdminListen, "err", err)
+		os.Exit(1)
+	}
+	go func() {
+		if err := adminServer.Serve(adminLn); err != nil {
+			errCh <- fmt.Errorf("管理界面退出：%w", err)
+		}
+	}()
+	log.Info("管理界面已启动", "addr", cfg.Server.AdminListen,
+		"allowed_cidrs", strings.Join(cfg.Server.AdminAllowedCIDRs, ","))
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -108,6 +127,9 @@ func main() {
 	defer cancel()
 	if err := rpcServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
 		log.Warn("关闭 RPC 时出现异常", "err", err)
+	}
+	if err := adminServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+		log.Warn("关闭管理界面时出现异常", "err", err)
 	}
 	log.Info("已退出")
 }

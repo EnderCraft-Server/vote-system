@@ -1,0 +1,19 @@
+{{define "login.html"}}
+{{template "head" .}}
+<main class="login-wrap">
+  <form method="post" action="/login" class="card login-card">
+    <h1>登录后台</h1>
+    <p class="muted">账号由运维在后台数据库或演示模式下创建。</p>
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    {{if .Error}}<p class="alert" role="alert">{{.Error}}</p>{{end}}
+    <label>用户名
+      <input type="text" name="username" autocomplete="username" required maxlength="32" autofocus>
+    </label>
+    <label>密码
+      <input type="password" name="password" autocomplete="current-password" required maxlength="128">
+    </label>
+    <button type="submit" class="btn-primary">登录</button>
+  </form>
+</main>
+{{template "foot" .}}
+{{end}}

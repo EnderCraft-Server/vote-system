@@ -1,0 +1,51 @@
+{{define "ip_rules.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>IP 规则</h1></div>
+  <p class="muted">拦截规则优先于放行规则。当前默认动作：<strong>{{if eq .Data.DefaultAction "deny"}}拒绝未命中放行的 IP{{else}}放行未命中拦截的 IP{{end}}</strong>（改 <span class="mono">limits.ip_default_action</span> 可切换）。</p>
+
+  <section class="card">
+    <h2>新增规则</h2>
+    <form method="post" action="/ip-rules" class="inline-form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>类型
+        <select name="kind">
+          <option value="block">拦截</option>
+          <option value="allow">放行</option>
+        </select>
+      </label>
+      <label>IP 或 CIDR
+        <input type="text" name="cidr" placeholder="203.0.113.7 或 10.0.0.0/8" required maxlength="64">
+      </label>
+      <label>备注
+        <input type="text" name="note" maxlength="200" placeholder="可留空">
+      </label>
+      <button type="submit" class="btn-primary">添加</button>
+    </form>
+  </section>
+
+  <table class="table">
+    <thead><tr><th>类型</th><th>网段</th><th>备注</th><th>创建时间</th><th class="acts">操作</th></tr></thead>
+    <tbody>
+    {{range .Data.Rules}}
+      <tr>
+        <td><span class="tag {{if eq .Kind "block"}}tag-closed{{else}}tag-open{{end}}">{{if eq .Kind "block"}}拦截{{else}}放行{{end}}</span></td>
+        <td class="mono">{{ruleCIDR .}}</td>
+        <td>{{.Note}}</td>
+        <td class="muted">{{fmtDateTime .CreatedAt}}</td>
+        <td class="acts">
+          <form method="post" action="/ip-rules/{{.ID}}/delete" class="inline">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <button type="submit" class="btn-quiet">删除</button>
+          </form>
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="5" class="empty">还没有规则</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+</main>
+{{template "foot" .}}
+{{end}}

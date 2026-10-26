@@ -1,0 +1,85 @@
+{{define "poll_form.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+{{with .Data}}
+<main class="page">
+  <div class="page-head">
+    <h1>{{if .Poll}}编辑投票{{else}}新建投票{{end}}</h1>
+    <div class="head-acts">
+      {{if .Poll}}<a class="btn-quiet" href="/polls/{{.Poll.ID}}/results">查看结果</a>{{end}}
+      <a class="btn-quiet" href="/">返回列表</a>
+    </div>
+  </div>
+
+  {{if .HasVotes}}<p class="notice">该投票已经有人投过票，题目与选项变为只读；如需改题，请新建一个投票。</p>{{end}}
+
+  <form method="post" action="{{if .Poll}}/polls/{{.Poll.ID}}{{else}}/polls{{end}}" class="form">
+    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+
+    <section class="card">
+      <h2>基本信息</h2>
+      <label>标题 <span class="req">必填</span>
+        <input type="text" name="title" maxlength="160" required value="{{if .Poll}}{{.Poll.Title}}{{end}}">
+      </label>
+      <label>简介
+        <textarea name="summary" rows="2" maxlength="500">{{if .Poll}}{{.Poll.Summary}}{{end}}</textarea>
+      </label>
+      <div class="grid-3">
+        <label>状态
+          <select name="status">
+            <option value="draft" {{if .Poll}}{{if eq .Poll.Status "draft"}}selected{{end}}{{else}}selected{{end}}>草稿（前台不可见）</option>
+            <option value="open" {{if .Poll}}{{if eq .Poll.Status "open"}}selected{{end}}{{end}}>进行中</option>
+            <option value="closed" {{if .Poll}}{{if eq .Poll.Status "closed"}}selected{{end}}{{end}}>已结束</option>
+          </select>
+        </label>
+        <label>结果公开方式
+          <select name="show_results">
+            <option value="after_vote" {{if .Poll}}{{if eq .Poll.ShowResults "after_vote"}}selected{{end}}{{else}}selected{{end}}>投票后可见</option>
+            <option value="always" {{if .Poll}}{{if eq .Poll.ShowResults "always"}}selected{{end}}{{end}}>立即公开</option>
+            <option value="never" {{if .Poll}}{{if eq .Poll.ShowResults "never"}}selected{{end}}{{end}}>不公开</option>
+          </select>
+        </label>
+        <label>开始时间（留空立即开始）
+          <input type="datetime-local" name="starts_at" value="{{if .Poll}}{{fmtLocalIn .Poll.StartsAt}}{{end}}">
+        </label>
+      </div>
+      <label>结束时间（留空不限）
+        <input type="datetime-local" name="ends_at" value="{{if .Poll}}{{fmtLocalIn .Poll.EndsAt}}{{end}}">
+      </label>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>题目</h2>
+        {{if not .HasVotes}}<button type="button" class="btn-quiet" data-add-question>＋ 添加题目</button>{{end}}
+      </div>
+      <p class="muted small">题型：单选 / 多选 / 简答 / 排序。排序题的选项就是参与排序的条目；简答题的选项会被忽略。</p>
+
+      <div id="questions"
+           data-qjson="{{.QuestionsJSON}}"
+           data-readonly="{{if .HasVotes}}1{{else}}0{{end}}">
+        <noscript><p class="alert">题目的渲染需要 JavaScript；若无法启用，请用接口/脚本方式维护。</p></noscript>
+      </div>
+    </section>
+
+    <div class="form-acts">
+      <button type="submit" class="btn-primary">保存</button>
+      <a class="btn-quiet" href="/">取消</a>
+    </div>
+  </form>
+
+  {{if .Poll}}
+  <section class="card danger-zone">
+    <h2>危险操作</h2>
+    <p class="muted">删除不可恢复；已有投票记录的投票会被拒绝删除。</p>
+    <form method="post" action="/polls/{{.Poll.ID}}/delete" onsubmit="return confirm('确定删除这个投票吗？');">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <button type="submit" class="btn-danger">删除投票</button>
+    </form>
+  </section>
+  {{end}}
+</main>
+{{end}}
+{{template "foot" .}}
+<script src="/static/admin.js"></script>
+{{end}}
