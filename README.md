@@ -39,7 +39,7 @@
 # 1. 后台（终端 A）
 cd backend
 copy config\config.example.yaml config\config.yaml
-# 把 database.driver 改成 memory，demo.seed 改成 true，然后：
+# 把 env 改成 development、database.driver 改成 memory、demo.seed 改成 true，然后：
 go run ./cmd/voted -config ./config/config.yaml
 #   RPC  监听 127.0.0.1:7788（给 PHP 用）
 #   管理 监听 127.0.0.1:7789（浏览器打开 http://127.0.0.1:7789）
