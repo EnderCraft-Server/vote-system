@@ -696,9 +696,10 @@ func (s *Server) handleResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	votes, _ := s.st.ListVotes(r.Context(), p.ID, 100)
+	ipStats, _ := s.st.PollIPStats(r.Context(), p.ID, 50)
 	s.render(w, r, "results", pageData{
 		Title: "结果：" + p.Title, Nav: "dashboard", Admin: admin, CSRF: s.csrfFor(r),
-		Data: map[string]any{"Poll": p, "Result": res, "Votes": votes},
+		Data: map[string]any{"Poll": p, "Result": res, "Votes": votes, "IPStats": ipStats},
 	})
 }
 

@@ -54,6 +54,26 @@
   {{end}}
 
   <section class="card">
+    <div class="card-head"><h2>按 IP 统计</h2><span class="muted small">用来判断是否有人刷票（关掉一 IP 一票时尤其要看这里）</span></div>
+    <table class="table compact">
+      <thead><tr><th>IP</th><th class="num">票数</th><th>首次</th><th>最近</th><th>判定</th></tr></thead>
+      <tbody>
+      {{range .IPStats}}
+        <tr>
+          <td class="mono">{{.IPText}}</td>
+          <td class="num">{{.Votes}}</td>
+          <td class="muted">{{fmtDateTime .FirstAt}}</td>
+          <td class="muted">{{fmtDateTime .LastAt}}</td>
+          <td>{{if gt .Votes 1}}<span class="tag tag-closed">同 IP 多票</span>{{else}}<span class="tag tag-open">正常</span>{{end}}</td>
+        </tr>
+      {{else}}
+        <tr><td colspan="5" class="empty">还没有票</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
     <div class="card-head"><h2>最近投票</h2><span class="muted small">最多显示 100 条</span></div>
     <table class="table compact">
       <thead><tr><th>时间</th><th>IP</th><th>回执</th></tr></thead>

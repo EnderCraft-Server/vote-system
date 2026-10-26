@@ -389,6 +389,27 @@ func (s *Store) ListVotes(ctx context.Context, pollID int64, limit int) ([]store
 	return out, rows.Err()
 }
 
+func (s *Store) PollIPStats(ctx context.Context, pollID int64, limit int) ([]store.IPStat, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT ip_text, COUNT(*) AS n, MIN(created_at), MAX(created_at)
+		FROM votes WHERE poll_id = ? GROUP BY ip, ip_text ORDER BY n DESC, MAX(created_at) DESC LIMIT ?`, pollID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.IPStat
+	for rows.Next() {
+		var s store.IPStat
+		if err := rows.Scan(&s.IPText, &s.Votes, &s.FirstAt, &s.LastAt); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) CreateCaptcha(ctx context.Context, c *store.Captcha) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO captchas (id, ip, ip_text, answer_hash, attempts, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		c.ID, c.IP, c.IPText, c.AnswerHash, c.Attempts, c.ExpiresAt)
