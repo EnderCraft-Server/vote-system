@@ -1,8 +1,10 @@
 package vote
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
 	"strings"
 	"testing"
 	"time"
@@ -121,6 +123,39 @@ func TestSubmitAndRejectSecondVote(t *testing.T) {
 	in.Captcha.ID, in.Captcha.Answer = capID, "123456"
 	if _, err := f.svc.Submit(context.Background(), in); !errors.Is(err, ErrCaptchaExpired) {
 		t.Fatalf("期望验证码失效，得到 %v", err)
+	}
+}
+
+func TestCreateCaptchaReturnsUsablePNG(t *testing.T) {
+	f := newFixture(t, nil)
+	id, ttl, err := f.svc.CreateCaptcha(context.Background(), "203.0.113.44")
+	if err != nil {
+		t.Fatalf("CreateCaptcha: %v", err)
+	}
+	if ttl <= 0 || len(id) < 16 {
+		t.Fatalf("id/ttl 异常：%q %d", id, ttl)
+	}
+	png, err := f.svc.CaptchaImage(id)
+	if err != nil {
+		t.Fatalf("CaptchaImage: %v", err)
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(png))
+	if err != nil {
+		t.Fatalf("生成的图片无法解码：%v", err)
+	}
+	if format != "png" {
+		t.Fatalf("格式 = %q，期望 png", format)
+	}
+	if cfg.Width != 320 || cfg.Height != 100 {
+		t.Fatalf("尺寸 = %dx%d，期望 320x100", cfg.Width, cfg.Height)
+	}
+	// 库里只存答案的哈希，不存明文
+	row, err := f.st.GetCaptcha(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(row.AnswerHash) != 64 {
+		t.Fatalf("AnswerHash 长度 = %d，应为 sha256 十六进制", len(row.AnswerHash))
 	}
 }
 

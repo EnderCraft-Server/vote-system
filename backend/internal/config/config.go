@@ -124,7 +124,7 @@ func Default() *Config {
 		},
 		Captcha: Captcha{
 			Enabled:           true,
-			Length:            5,
+			Length:            4,
 			TTL:               Duration{5 * time.Minute},
 			MaxAttempts:       3,
 			CreatePerIPMinute: 10,
