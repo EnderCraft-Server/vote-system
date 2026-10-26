@@ -47,11 +47,26 @@ go run ./cmd/voted -config ./config/config.yaml
 # 2. 前台（终端 B）
 cd frontend
 copy config\config.example.php config\config.php
-php -S 127.0.0.1:8080 -t public public/index.php
+php -S 127.0.0.1:8080 -t public dev-router.php
 #   打开 http://127.0.0.1:8080
 ```
 
 两边配置里的 `security.rpc_secret` / `rpc_secret` **必须完全一致**，否则后台会直接拒绝所有请求并记日志。
+
+## 前台一览
+
+| 路由 | 页面 |
+| --- | --- |
+| @@BT@@/@@BT@@ | 进行中的投票列表 |
+| @@BT@@/p/{slug}@@BT@@ | 投票页（单选 / 多选 / 简答 / 排序 + 验证码） |
+| @@BT@@/p/{slug}/submit@@BT@@ | 提交（POST，CSRF + 验证码 + 一 IP 一票） |
+| @@BT@@/p/{slug}/result@@BT@@ | 统计结果（按管理端设置决定是否公开） |
+| @@BT@@/captcha/{id}.png@@BT@@ | 验证码图片 |
+
+- 前台**不连数据库**，所有数据经 TCP RPC 找后台要；页面没有任何登录态 Cookie。
+- 生产环境把 @@BT@@env@@BT@@ 设为 @@BT@@production@@BT@@、@@BT@@debug@@BT@@ 设为 @@BT@@false@@BT@@：PHP 报错只进日志，
+  页面统一显示"服务暂时不可用，请稍后再试"。开发模式才会显示细节与后台返回的 message。
+- 视觉规范见 [docs/DESIGN.md](docs/DESIGN.md)（配色对比度、玻璃只用在哪一层、响应式与可访问性）。
 
 ## 生产部署
 
