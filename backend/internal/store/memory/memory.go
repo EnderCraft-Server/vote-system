@@ -493,6 +493,43 @@ func (s *Store) DeleteAdmin(_ context.Context, id int64) error {
 	return nil
 }
 
+func (s *Store) SetAdminTOTP(_ context.Context, id int64, secret string, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.admins[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	a.TOTPSecret = secret
+	a.TOTPBoundAt = &at
+	a.TOTPLastStep = 0
+	return nil
+}
+
+func (s *Store) ClearAdminTOTP(_ context.Context, id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.admins[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	a.TOTPSecret = ""
+	a.TOTPBoundAt = nil
+	a.TOTPLastStep = 0
+	return nil
+}
+
+func (s *Store) UpdateAdminTOTPStep(_ context.Context, id int64, step int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.admins[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	a.TOTPLastStep = step
+	return nil
+}
+
 func (s *Store) CreateSession(_ context.Context, sess *store.AdminSession) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

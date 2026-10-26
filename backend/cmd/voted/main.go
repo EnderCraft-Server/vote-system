@@ -16,6 +16,7 @@ import (
 
 	"github.com/EnderCraft-Server/vote-system/backend/internal/admin"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
+	"github.com/EnderCraft-Server/vote-system/backend/internal/console"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/demo"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/logx"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/rpc"
@@ -30,6 +31,7 @@ const version = "0.1.0"
 func main() {
 	configPath := flag.String("config", "./config/config.yaml", "配置文件路径")
 	showVersion := flag.Bool("version", false, "打印版本号后退出")
+	unbindTOTP := flag.String("unbind-totp", "", "解绑指定管理员的 authenticator 后退出（systemd 下用，控制台不可交互时）")
 	flag.Parse()
 
 	if *showVersion {
@@ -61,6 +63,28 @@ func main() {
 		if pwd != "" {
 			log.Warn("已创建演示管理员，请立即登录并修改密码", "username", cfg.Demo.AdminUsername, "password", pwd)
 		}
+	}
+
+	if *unbindTOTP != "" {
+		admin, err := st.GetAdminByUsername(context.Background(), *unbindTOTP)
+		if err != nil {
+			log.Error("找不到该管理员", "username", *unbindTOTP)
+			os.Exit(1)
+		}
+		if admin.TOTPSecret == "" {
+			log.Warn("该管理员尚未绑定 authenticator", "username", *unbindTOTP)
+			return
+		}
+		if err := st.ClearAdminTOTP(context.Background(), admin.ID); err != nil {
+			log.Error("解绑失败", "err", err)
+			os.Exit(1)
+		}
+		_ = st.AddAudit(context.Background(), &store.AuditEntry{
+			Actor: "console", Action: "totp_unbind", Target: "admin:" + *unbindTOTP,
+			IPText: "local", Detail: "启动参数 -unbind-totp",
+		})
+		log.Warn("已解绑 authenticator", "username", *unbindTOTP)
+		return
 	}
 
 	svc := vote.New(st, cfg)
@@ -102,6 +126,8 @@ func main() {
 	}()
 	log.Info("管理界面已启动", "addr", cfg.Server.AdminListen,
 		"allowed_cidrs", strings.Join(cfg.Server.AdminAllowedCIDRs, ","))
+
+	go console.New(st, log.With("component", "console")).Run(context.Background())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

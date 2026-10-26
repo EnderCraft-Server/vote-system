@@ -513,16 +513,21 @@ func (s *Store) DeleteIPRule(ctx context.Context, id int64) error {
 	return nil
 }
 
-const adminColumns = "id, username, password_hash, display_name, is_active, failed_logins, locked_until, last_login_at, last_login_ip, created_at"
+const adminColumns = "id, username, password_hash, display_name, is_active, failed_logins, locked_until, last_login_at, last_login_ip, created_at, totp_secret, totp_bound_at, totp_last_step"
 
 func scanAdmin(row scannable) (*store.Admin, error) {
 	var (
-		a                 store.Admin
-		locked, lastLogin sql.NullTime
+		a                         store.Admin
+		locked, lastLogin, totpAt sql.NullTime
 	)
 	if err := row.Scan(&a.ID, &a.Username, &a.PasswordHash, &a.DisplayName, &a.Active,
-		&a.FailedLogins, &locked, &lastLogin, &a.LastLoginIP, &a.CreatedAt); err != nil {
+		&a.FailedLogins, &locked, &lastLogin, &a.LastLoginIP, &a.CreatedAt,
+		&a.TOTPSecret, &totpAt, &a.TOTPLastStep); err != nil {
 		return nil, wrap(err)
+	}
+	if totpAt.Valid {
+		t := totpAt.Time
+		a.TOTPBoundAt = &t
 	}
 	if locked.Valid {
 		t := locked.Time
@@ -615,6 +620,21 @@ func (s *Store) DeleteAdmin(ctx context.Context, id int64) error {
 		return store.ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) SetAdminTOTP(ctx context.Context, id int64, secret string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE admins SET totp_secret = ?, totp_bound_at = ?, totp_last_step = 0 WHERE id = ?", secret, at, id)
+	return err
+}
+
+func (s *Store) ClearAdminTOTP(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE admins SET totp_secret = '', totp_bound_at = NULL, totp_last_step = 0 WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) UpdateAdminTOTPStep(ctx context.Context, id int64, step int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE admins SET totp_last_step = ? WHERE id = ?", step, id)
+	return err
 }
 
 func (s *Store) CreateSession(ctx context.Context, sess *store.AdminSession) error {
