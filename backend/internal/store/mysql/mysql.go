@@ -386,8 +386,8 @@ func (s *Store) ListVotes(ctx context.Context, pollID int64, limit int) ([]store
 }
 
 func (s *Store) CreateCaptcha(ctx context.Context, c *store.Captcha) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO captchas (id, ip, ip_text, attempts, expires_at) VALUES (?, ?, ?, ?, ?)`,
-		c.ID, c.IP, c.IPText, c.Attempts, c.ExpiresAt)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO captchas (id, ip, ip_text, answer_hash, attempts, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		c.ID, c.IP, c.IPText, c.AnswerHash, c.Attempts, c.ExpiresAt)
 	return err
 }
 
@@ -396,9 +396,9 @@ func (s *Store) GetCaptcha(ctx context.Context, id string) (*store.Captcha, erro
 		c        store.Captcha
 		consumed sql.NullTime
 	)
-	err := s.db.QueryRowContext(ctx, `SELECT id, ip, ip_text, attempts, created_at, expires_at, consumed_at
+	err := s.db.QueryRowContext(ctx, `SELECT id, ip, ip_text, answer_hash, attempts, created_at, expires_at, consumed_at
 		FROM captchas WHERE id = ?`, id).
-		Scan(&c.ID, &c.IP, &c.IPText, &c.Attempts, &c.CreatedAt, &c.ExpiresAt, &consumed)
+		Scan(&c.ID, &c.IP, &c.IPText, &c.AnswerHash, &c.Attempts, &c.CreatedAt, &c.ExpiresAt, &consumed)
 	if err != nil {
 		return nil, wrap(err)
 	}
