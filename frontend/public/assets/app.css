@@ -341,6 +341,7 @@ h1 {
 .pow-status { color: var(--ink-2); }
 .pow-status[data-state="error"] { color: var(--stamp); }
 .pow-status[data-state="ok"]::before { content: "✓ "; color: var(--ok); }
+.pow-status[data-state="run"]::before { content: ""; }
 
 /* ---------- 验证码 ---------- */
 .captcha { padding: 26px 0 6px; border-top: 1px solid var(--rule-2); margin-top: 8px; }
