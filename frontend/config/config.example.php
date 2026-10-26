@@ -35,7 +35,7 @@ return [
 
     'captcha' => [
         'enabled' => true,
-        'length'  => 6,
+        'length'  => 4,
     ],
 
     'log' => [
