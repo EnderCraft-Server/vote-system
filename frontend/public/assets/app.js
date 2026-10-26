@@ -101,7 +101,9 @@
       var msg = event.data || {};
       if (msg.progress !== undefined) {
         var pct = Math.min(99, Math.floor((msg.progress / Math.pow(2, challenge.bits)) * 100));
+        if (status) status.setAttribute("data-state", "run");
         setStatus("正在校验浏览器… " + pct + "%", false);
+        if (status) status.setAttribute("data-state", "run");
         return;
       }
       if (msg.ok) {
