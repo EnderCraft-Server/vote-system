@@ -69,7 +69,7 @@ func Seed(ctx context.Context, st store.Store, cfg *config.Config) (string, erro
 			Options: []string{"中心广场", "儿童活动区", "夜间照明", "分类垃圾房"},
 		},
 		{
-			Type: "multiple", Title: "这次改造最该优先解决哪些问题？", Hint: "最多选两项", Required: true,
+			Type: "multiple", Title: "这次改造最该优先解决哪些问题？", Required: true,
 			MinChoices: 1, MaxChoices: 2,
 			Options: []string{"无障碍通道", "夜间噪音", "非机动车停放", "绿化与遮阴", "监控与照明"},
 		},
