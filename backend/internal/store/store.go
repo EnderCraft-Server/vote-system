@@ -201,6 +201,10 @@ type Store interface {
 	ListVotes(ctx context.Context, pollID int64, limit int) ([]Vote, error)
 	// PollIPStats 按 IP 聚合该投票的票数，按票数降序。
 	PollIPStats(ctx context.Context, pollID int64, limit int) ([]IPStat, error)
+	// CountVotesByIP 返回某投票里该 IP 的票数（删除前预览）。
+	CountVotesByIP(ctx context.Context, pollID int64, ip []byte) (int, error)
+	// DeleteVotesByIP 删除某投票里该 IP 的全部票（答案级联删除），返回删除条数。
+	DeleteVotesByIP(ctx context.Context, pollID int64, ip []byte) (int64, error)
 
 	// 验证码
 	CreateCaptcha(ctx context.Context, c *Captcha) error

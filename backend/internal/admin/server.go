@@ -91,6 +91,13 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /audit", s.auth(s.handleAudit))
 	mux.HandleFunc("GET /account", s.auth(s.handleAccount))
+	mux.HandleFunc("GET /account/totp", s.auth(s.handleTOTPSetup))
+	mux.HandleFunc("GET /account/totp/qr", s.auth(s.handleTOTPQR))
+	mux.HandleFunc("POST /account/totp", s.auth(s.handleTOTPBind))
+
+	mux.HandleFunc("GET /super/danger", s.auth(s.handleDanger))
+	mux.HandleFunc("POST /super/danger/delete-ip", s.auth(s.handleDeleteByIP))
+	mux.HandleFunc("POST /super/danger/delete-poll", s.auth(s.handleDeletePoll))
 	mux.HandleFunc("POST /account/password", s.auth(s.handlePasswordChange))
 	mux.HandleFunc("GET /admins", s.auth(s.handleAdmins))
 	mux.HandleFunc("POST /admins", s.auth(s.handleAdminCreate))
@@ -665,7 +672,7 @@ func (s *Server) handlePollDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c, _ := s.st.CountVotes(r.Context(), id); c > 0 {
-		s.flashRedirect(w, r, "/", "该投票已有投票记录，不能删除")
+		s.flashRedirect(w, r, "/super/danger", "该投票已有 "+strconv.Itoa(c)+" 票，需要到「危险操作」页用动态验证码删除")
 		return
 	}
 	if err := s.st.DeletePoll(r.Context(), id); err != nil {

@@ -1,0 +1,56 @@
+{{define "danger.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>危险操作</h1></div>
+  <p class="muted">这里的操作会删除数据，每次都需要输入 authenticator 里的 6 位动态码。所有操作都会记入审计日志。</p>
+
+  {{if not .Data.TOTPBound}}
+    <p class="notice">当前账号还没有绑定动态验证码，暂时不能执行删除。<a href="/account/totp">去绑定</a></p>
+  {{end}}
+
+  <section class="card">
+    <h2>按 IP 删除某个投票里的票</h2>
+    <p class="muted small">只删除「该投票 + 该 IP」的票，其他 IP、其他投票不受影响。适合处理刷票。</p>
+    <form method="post" action="/super/danger/delete-ip" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>投票
+        <select name="poll_id" required>
+          {{range .Data.Polls}}
+            <option value="{{.Poll.ID}}">{{.Poll.Title}}（{{.VoteCount}} 票）</option>
+          {{end}}
+        </select>
+      </label>
+      <label>IP 地址
+        <input type="text" name="ip" placeholder="203.0.113.7" required maxlength="45">
+      </label>
+      <label>动态验证码
+        <input type="text" name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">
+      </label>
+      <label class="check"><input type="checkbox" name="confirm" required> 我确认要删除这个 IP 在该投票里的全部票</label>
+      <div class="form-acts"><button type="submit" class="btn-danger">删除这些票</button></div>
+    </form>
+  </section>
+
+  <section class="card danger-zone">
+    <h2>删除投票（连同已有票）</h2>
+    <p class="muted small">会级联删除所有票与答案，不可恢复。删除前请先导出需要的数据。</p>
+    <form method="post" action="/super/danger/delete-poll" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>投票
+        <select name="poll_id" required>
+          {{range .Data.Polls}}
+            <option value="{{.Poll.ID}}">{{.Poll.Title}}（{{.VoteCount}} 票）</option>
+          {{end}}
+        </select>
+      </label>
+      <label>动态验证码
+        <input type="text" name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">
+      </label>
+      <label class="check"><input type="checkbox" name="confirm" required> 我确认删除该投票及其全部票</label>
+      <div class="form-acts"><button type="submit" class="btn-danger">删除投票</button></div>
+    </form>
+  </section>
+</main>
+{{template "foot" .}}
+{{end}}

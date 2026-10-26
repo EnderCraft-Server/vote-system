@@ -221,3 +221,7 @@ button { font: inherit; cursor: pointer; border-radius: var(--radius); }
   .grid-2, .grid-3, .inline-form { grid-template-columns: 1fr; }
   .stats { flex-direction: column; }
 }
+
+/* TOTP 绑定 */
+.qr { display: block; margin: 12px 0; border: 1px solid var(--rule); border-radius: var(--radius); background: #fff; padding: 8px; }
+.secret { background: #FAFAF7; border: 1px solid var(--rule); border-radius: var(--radius); padding: 8px 10px; user-select: all; }
