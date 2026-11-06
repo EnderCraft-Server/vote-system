@@ -1,6 +1,7 @@
 package risk
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,8 @@ func cfg() config.Risk {
 		PollSpread:     3,
 		RegularityCV:   0.15,
 		UAChange:       3,
+		SharedUA:       3,
+		SubnetVotes:    8,
 	}
 }
 
@@ -73,6 +76,39 @@ func TestEvaluateLevels(t *testing.T) {
 	// 明细时间不超过上限且按时间排列
 	if len(byIP["1.1.1.1"].Times) != 12 {
 		t.Fatalf("明细条数不对：%d", len(byIP["1.1.1.1"].Times))
+	}
+}
+
+// 分布式刷票：每个 IP 只投 1~2 票，单看每个 IP 都很"干净"，
+// 但同一个 UA 出现在很多 IP 上、且集中在同一个 /24。
+func TestDistributedBotCaughtByCrossIPSignals(t *testing.T) {
+	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.Local)
+	var votes []store.Vote
+	for i := 0; i < 6; i++ {
+		// 同一 /24：203.0.113.0/24，每 20 秒一票，UA 全都一样
+		ip := []byte{203, 0, 113, byte(10 + i)}
+		votes = append(votes, store.Vote{
+			IP: ip, IPText: "203.0.113." + string(rune('0'+10+i)), PollID: 1,
+			CreatedAt: base.Add(time.Duration(i) * 20 * time.Second), UAHash: "same-ua",
+		})
+	}
+	reports := Evaluate(votes, cfg())
+	if len(reports) == 0 {
+		t.Fatal("应有报告")
+	}
+	// 至少有一条被判为中/高，且理由里出现跨 IP 信号
+	found := false
+	for _, r := range reports {
+		if r.Level == "medium" || r.Level == "high" {
+			for _, reason := range r.Reasons {
+				if strings.Contains(reason, "/24") || strings.Contains(reason, "同一个 UA") {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("跨 IP 信号没触发：%+v", reports[0])
 	}
 }
 
