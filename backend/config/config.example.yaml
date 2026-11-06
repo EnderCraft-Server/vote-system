@@ -38,6 +38,24 @@ security:
   admin_login_lockout: 15m
   admin_bcrypt_cost: 12
 
+# 危险操作（删票/删投票）的二次授权。开启后不再使用 TOTP，
+# 而是让管理员用外部 OAuth2 身份重新授权一次（Authorization Code 模式）。
+oauth:
+  enabled: false
+  authorize_url: "https://sso.example.com/oauth2/authorize"
+  token_url: "https://sso.example.com/oauth2/token"
+  userinfo_url: "https://sso.example.com/oauth2/userinfo"
+  client_id: ""
+  client_secret: ""
+  redirect_uri: "https://admin.vote.example.com/oauth/callback"
+  scopes: ["openid", "profile", "email"]
+  # 从 userinfo 的 JSON 里取字段（支持点号路径，例如 "data.user.id"）
+  subject_field: "sub"          # 稳定且唯一的用户标识；GitHub 用 "id"
+  email_field: "email"
+  allowed_email_domains: []     # 留空不限制；填了则邮箱域名必须在列表里
+  timeout: 10s
+  pending_ttl: 5m               # 待执行操作的存活时间（状态是一次性的）
+
 captcha:
   enabled: true                       # 图片验证码（人机判别的"人"那一层）
   length: 4                           # 验证码位数（4~8；图片固定 320x100，5 位以上会明显变糊）

@@ -1,0 +1,20 @@
+{{define "oauth_done.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>授权结果</h1></div>
+  {{with .Data}}
+  <section class="card">
+    {{if .OK}}
+      <p><span class="tag tag-open">成功</span></p>
+    {{else}}
+      <p><span class="tag tag-closed">未执行</span></p>
+    {{end}}
+    <p>{{.Message}}</p>
+    <p class="muted small">本页不需要登录态：授权回调是从身份提供方跨站跳回来的，会话 Cookie 不会带上，所以结果只看这一次性请求本身。</p>
+  </section>
+  {{end}}
+  <p><a class="btn-quiet" href="/super/danger">回到危险操作</a> <a class="btn-quiet" href="/account/oauth">外部身份授权</a></p>
+</main>
+{{template "foot" .}}
+{{end}}

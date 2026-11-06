@@ -49,6 +49,9 @@ type Server struct {
 
 	mu       sync.Mutex
 	attempts map[string]*loginAttempt
+
+	pendingMu sync.Mutex
+	pending   map[string]*pendingAction
 }
 
 type loginAttempt struct {
@@ -65,6 +68,7 @@ func New(cfg *config.Config, st store.Store, svc *vote.Service, log *slog.Logger
 		cfg: cfg, st: st, svc: svc, log: log,
 		tpl: tpl, now: time.Now,
 		attempts: make(map[string]*loginAttempt),
+		pending:  make(map[string]*pendingAction),
 	}, nil
 }
 
@@ -91,9 +95,9 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /audit", s.auth(s.handleAudit))
 	mux.HandleFunc("GET /account", s.auth(s.handleAccount))
-	mux.HandleFunc("GET /account/totp", s.auth(s.handleTOTPSetup))
-	mux.HandleFunc("GET /account/totp/qr", s.auth(s.handleTOTPQR))
-	mux.HandleFunc("POST /account/totp", s.auth(s.handleTOTPBind))
+	mux.HandleFunc("GET /account/oauth", s.auth(s.handleOAuthAccount))
+	mux.HandleFunc("POST /account/oauth/bind", s.auth(s.handleOAuthBindStart))
+	mux.HandleFunc("GET /oauth/callback", s.handleOAuthCallback)
 
 	mux.HandleFunc("GET /super/danger", s.auth(s.handleDanger))
 	mux.HandleFunc("POST /super/danger/delete-ip", s.auth(s.handleDeleteByIP))

@@ -124,6 +124,10 @@ type Admin struct {
 	TOTPSecret   string
 	TOTPBoundAt  *time.Time
 	TOTPLastStep int64
+	// OAuthSubject 是绑定的外部身份（userinfo 里的稳定 ID）；为空表示未绑定。
+	OAuthSubject string
+	OAuthEmail   string
+	OAuthBoundAt *time.Time
 }
 
 type AdminSession struct {
@@ -232,6 +236,9 @@ type Store interface {
 	SetAdminTOTP(ctx context.Context, id int64, secret string, at time.Time) error
 	ClearAdminTOTP(ctx context.Context, id int64) error
 	UpdateAdminTOTPStep(ctx context.Context, id int64, step int64) error
+	// 绑定/解绑外部 OAuth2 身份（每个账号只能绑一次，解绑走后台控制台）。
+	SetAdminOAuth(ctx context.Context, id int64, subject, email string, at time.Time) error
+	ClearAdminOAuth(ctx context.Context, id int64) error
 	CreateSession(ctx context.Context, s *AdminSession) error
 	GetSession(ctx context.Context, tokenHash string) (*AdminSession, error)
 	TouchSession(ctx context.Context, tokenHash string, at time.Time) error

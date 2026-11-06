@@ -117,3 +117,29 @@ MySQL
 3. 全站 HTTPS；`admin_cookie_secure: true` 保持不变。
 4. MySQL 用独立账号，只授权 `vote_system` 库，不要用 root。
 5. 备份 `vote_system`，并定期检查 `storage/logs/app.log` 与 `voted` 的 journal。
+
+
+## 危险操作的二次授权（OAuth2）
+
+原来的 TOTP 已替换成"外部身份授权"，流程：
+
+```text
+POST /super/danger/delete-ip     （已登录 + CSRF + 勾选确认）
+   → 服务端建一次性 pending{发起人, 动作, 目标, 5 分钟过期}
+   → 302 到 provider 的 /authorize?state=<pending id>
+   → 用户在 provider 登录/授权
+   → GET /oauth/callback?code=..&state=..
+        ├ 校验 state 存在且未过期（取出即删，防重放）
+        ├ code 换 token（client_secret 只在服务端）
+        ├ 读 userinfo，取 oauth.subject_field 作为身份标识
+        ├ 必须等于该管理员绑定的 oauth_subject，否则拒绝并记 oauth_subject_mismatch
+        └ 执行删除 + 写审计
+```
+
+- **每个账号只能绑一次**：绑定页 `/account/oauth` 跳一次授权即绑定；之后不可自助换绑，只能在后台控制台
+  `unbind oauth <用户名>`（systemd 下用 `voted -unbind-oauth <用户名>`），两者都写审计。
+- **callback 不依赖会话 Cookie**：从 provider 跳回来是跨站请求，SameSite=Strict 的会话本来就不会带上；
+  身份完全由"服务端 pending 里的发起人 + provider 返回的 subject"决定。
+- **pending 一次性 + 5 分钟过期**，state 是随机的 24 字节，猜不到也复用不了。
+- 可选 `oauth.allowed_email_domains` 限定只能是公司域邮箱。
+- 没启用 OAuth2（`oauth.enabled: false`）时，危险操作直接不可用——不会退化成"输密码就能删"。

@@ -1,0 +1,34 @@
+{{define "oauth.html"}}
+{{template "head" .}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>外部身份授权</h1></div>
+  {{with .Data}}
+  {{if not .Enabled}}
+    <p class="notice">后台没有启用 OAuth2（配置里的 <span class="mono">oauth.enabled</span> 为 false），危险操作不可用。</p>
+  {{else if .Bound}}
+    <section class="card">
+      <h2>已绑定</h2>
+      <dl class="kv">
+        <dt>身份标识</dt><dd class="mono">{{.Subject}}</dd>
+        <dt>邮箱</dt><dd class="mono">{{if .Email}}{{.Email}}{{else}}—{{end}}</dd>
+        <dt>绑定时间</dt><dd>{{fmtOpt .BoundAt}}</dd>
+      </dl>
+      <p class="muted">每个账号只能绑定一次。换账号或身份失效时，请在服务器控制台执行
+        <span class="mono">unbind oauth &lt;用户名&gt;</span>，然后回本页重新绑定。</p>
+    </section>
+  {{else}}
+    <section class="card">
+      <h2>绑定你的外部身份</h2>
+      <p>点下面的按钮会跳到身份提供方登录/授权，成功后回到本站完成绑定。</p>
+      <p class="muted small">绑定后每次删除数据都要再走一次这个授权流程；授权账号必须与这里绑定的一致。</p>
+      <form method="post" action="/account/oauth/bind">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button type="submit" class="btn-primary">跳转授权并绑定</button>
+      </form>
+    </section>
+  {{end}}
+  {{end}}
+</main>
+{{template "foot" .}}
+{{end}}

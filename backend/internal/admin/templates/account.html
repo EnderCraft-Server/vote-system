@@ -14,10 +14,10 @@
   </section>
 
   <section class="card">
-    <h2>动态验证码（authenticator）</h2>
-    <p>{{if .Admin.TOTPSecret}}<span class="tag tag-open">已绑定</span> 于 {{fmtOpt .Admin.TOTPBoundAt}}{{else}}<span class="tag tag-warn">未绑定</span>{{end}}</p>
-    <p class="muted small">删除票等危险操作需要动态码；每个账号只能绑定一次，解绑请在服务器上执行控制台命令。</p>
-    <p><a class="btn-quiet" href="/account/totp">{{if .Admin.TOTPSecret}}查看绑定信息{{else}}去绑定{{end}}</a></p>
+    <h2>外部身份授权（OAuth2）</h2>
+    <p>{{if .Admin.OAuthSubject}}<span class="tag tag-open">已绑定</span> {{if .Admin.OAuthEmail}}<span class="mono">{{.Admin.OAuthEmail}}</span>{{end}}{{else}}<span class="tag tag-warn">未绑定</span>{{end}}</p>
+    <p class="muted small">删除数据等危险操作需要先绑定外部身份，并在执行时重新授权一次。解绑请在服务器控制台执行。</p>
+    <p><a class="btn-quiet" href="/account/oauth">{{if .Admin.OAuthSubject}}查看绑定信息{{else}}去绑定{{end}}</a></p>
   </section>
 
   <section class="card">

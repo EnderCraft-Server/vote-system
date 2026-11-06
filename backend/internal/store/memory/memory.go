@@ -559,6 +559,32 @@ func (s *Store) UpdateAdminTOTPStep(_ context.Context, id int64, step int64) err
 	return nil
 }
 
+func (s *Store) SetAdminOAuth(_ context.Context, id int64, subject, email string, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.admins[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	a.OAuthSubject = subject
+	a.OAuthEmail = email
+	a.OAuthBoundAt = &at
+	return nil
+}
+
+func (s *Store) ClearAdminOAuth(_ context.Context, id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a, ok := s.admins[id]
+	if !ok {
+		return store.ErrNotFound
+	}
+	a.OAuthSubject = ""
+	a.OAuthEmail = ""
+	a.OAuthBoundAt = nil
+	return nil
+}
+
 func (s *Store) CreateSession(_ context.Context, sess *store.AdminSession) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
