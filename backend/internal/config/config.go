@@ -196,8 +196,8 @@ func Default() *Config {
 			CreatePerIPMinute: 10,
 			Pow: Pow{
 				Enabled:       true,
-				BaseBits:      18,
-				MaxBits:       24,
+				BaseBits:      17,
+				MaxBits:       21,
 				EscalateEvery: 3,
 				TTL:           Duration{5 * time.Minute},
 				Window:        Duration{10 * time.Minute},
