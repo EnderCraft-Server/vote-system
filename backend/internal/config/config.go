@@ -32,6 +32,7 @@ type Config struct {
 	Database Database `yaml:"database"`
 	Security Security `yaml:"security"`
 	OAuth    OAuth    `yaml:"oauth"`
+	Risk     Risk     `yaml:"risk"`
 	Captcha  Captcha  `yaml:"captcha"`
 	Limits   Limits   `yaml:"limits"`
 	Demo     Demo     `yaml:"demo"`
@@ -67,6 +68,18 @@ type Security struct {
 	AdminLoginMaxAttempt int      `yaml:"admin_login_max_attempts"`
 	AdminLoginLockout    Duration `yaml:"admin_login_lockout"`
 	AdminBcryptCost      int      `yaml:"admin_bcrypt_cost"`
+}
+
+// Risk 是风控阈值：只看"最近 window 内的票"，对同一个 IP 聚合打分。
+type Risk struct {
+	Window         Duration `yaml:"window"`
+	MinVotes       int      `yaml:"min_votes"`
+	VolumeWarn     int      `yaml:"volume_warn"`
+	VolumeHigh     int      `yaml:"volume_high"`
+	BurstPerMinute int      `yaml:"burst_per_minute"`
+	PollSpread     int      `yaml:"poll_spread"`
+	RegularityCV   float64  `yaml:"regularity_cv"`
+	UAChange       int      `yaml:"ua_change"`
 }
 
 // OAuth 是"危险操作二次授权"用的 OAuth2 客户端配置。
@@ -155,6 +168,16 @@ func Default() *Config {
 			AdminLoginMaxAttempt: 5,
 			AdminLoginLockout:    Duration{15 * time.Minute},
 			AdminBcryptCost:      12,
+		},
+		Risk: Risk{
+			Window:         Duration{24 * time.Hour},
+			MinVotes:       3,
+			VolumeWarn:     10,
+			VolumeHigh:     30,
+			BurstPerMinute: 5,
+			PollSpread:     3,
+			RegularityCV:   0.15,
+			UAChange:       3,
 		},
 		OAuth: OAuth{
 			Enabled:            false,
@@ -292,6 +315,15 @@ func (c *Config) Validate() error {
 		if c.Captcha.Pow.EscalateEvery < 1 {
 			add("captcha.pow.escalate_every 至少为 1")
 		}
+	}
+	if c.Risk.Window.Duration <= 0 {
+		add("risk.window 必须大于 0")
+	}
+	if c.Risk.VolumeWarn <= 0 || c.Risk.VolumeHigh < c.Risk.VolumeWarn {
+		add("risk.volume_warn / volume_high 需 >0 且 high >= warn")
+	}
+	if c.Risk.BurstPerMinute <= 0 || c.Risk.PollSpread <= 0 || c.Risk.UAChange <= 0 {
+		add("risk.burst_per_minute / poll_spread / ua_change 需 > 0")
 	}
 	if c.OAuth.Enabled {
 		if c.OAuth.AuthorizeURL == "" || c.OAuth.TokenURL == "" || c.OAuth.UserinfoURL == "" {
