@@ -1,0 +1,17 @@
+{{define "oauth_go.html"}}
+{{template "head" .}}
+{{with .Data}}
+<meta http-equiv="refresh" content="0; url={{.URL}}">
+{{end}}
+{{template "nav" .}}
+<main class="page">
+  <div class="page-head"><h1>正在跳转授权…</h1></div>
+  {{with .Data}}
+  <section class="card">
+    <p>如果浏览器没有自动跳转，<a href="{{.URL}}">点这里继续</a>。</p>
+    <p class="muted small mono" style="word-break:break-all">{{.URL}}</p>
+  </section>
+  {{end}}
+</main>
+{{template "foot" .}}
+{{end}}

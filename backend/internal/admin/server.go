@@ -98,6 +98,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /account", s.auth(s.handleAccount))
 	mux.HandleFunc("GET /account/oauth", s.auth(s.handleOAuthAccount))
 	mux.HandleFunc("POST /account/oauth/bind", s.auth(s.handleOAuthBindStart))
+	mux.HandleFunc("GET /oauth/go", s.handleOAuthGo)
 	mux.HandleFunc("GET /oauth/callback", s.handleOAuthCallback)
 
 	mux.HandleFunc("GET /super/danger", s.auth(s.handleDanger))
@@ -132,8 +133,7 @@ func (s *Server) chain(next http.Handler) http.Handler {
 			}
 		}()
 
-		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", s.csp())
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
@@ -146,6 +146,26 @@ func (s *Server) chain(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// csp 生成安全响应头。form-action 必须带上 OAuth 提供方的源：
+// 表单提交会 303 到 provider，Chrome 会把整条重定向链都按 form-action 检查，
+// 只写 'self' 会导致"点授权按钮没反应"（请求都没发出）。
+func (s *Server) csp() string {
+	return "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; " +
+		"form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+}
+
+// oauthOrigin 返回 authorize_url 的 scheme://host[:port]。
+func (s *Server) oauthOrigin() string {
+	if !s.cfg.OAuth.Enabled {
+		return ""
+	}
+	u, err := url.Parse(s.cfg.OAuth.AuthorizeURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 func (s *Server) allowedByCIDR(r *http.Request) bool {

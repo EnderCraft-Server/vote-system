@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,35 @@ func (s *Server) putPending(p *pendingAction) {
 	s.pending[p.ID] = p
 }
 
+// peekPending 只查看不消费，/oauth/go 用它确认 state 还活着。
+func (s *Server) peekPending(id string) (*pendingAction, bool) {
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+	p, ok := s.pending[id]
+	if !ok || s.now().After(p.Expires) {
+		return nil, false
+	}
+	return p, true
+}
+
+// handleOAuthGo 是表单提交后的同源落点。
+//
+// 这里**不能**直接 303 到 provider：我们的 CSP 是 form-action 'self'，
+// Chrome 会把"表单提交 + 重定向链"整体按 form-action 检查，跨源那一跳会被拦掉
+// （现象就是点按钮没反应）。所以先返回一个同源页面，用 meta refresh 做一次
+// 普通顶层导航——导航不受 form-action 约束。
+func (s *Server) handleOAuthGo(w http.ResponseWriter, r *http.Request) {
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	if _, ok := s.peekPending(state); !ok {
+		s.renderOAuthDone(w, r, false, "授权请求已过期或不存在，请回到上一页重新发起")
+		return
+	}
+	s.render(w, r, "oauth_go", pageData{
+		Title: "正在跳转授权",
+		Data:  map[string]any{"URL": s.oauthClient().AuthCodeURL(state)},
+	})
+}
+
 func (s *Server) takePending(id string) (*pendingAction, bool) {
 	s.pendingMu.Lock()
 	defer s.pendingMu.Unlock()
@@ -75,7 +105,10 @@ func (s *Server) startOAuth(w http.ResponseWriter, r *http.Request, p *pendingAc
 		p.Expires = s.now().Add(s.pendingTTL())
 	}
 	s.putPending(p)
-	http.Redirect(w, r, s.oauthClient().AuthCodeURL(p.ID), http.StatusSeeOther)
+	// 不能直接把表单响应 302 到 provider：我们的 CSP 是 form-action 'self'，
+	// Chrome 会把"表单提交 + 跨源重定向"判成违规并直接拦掉请求。
+	// 所以先回到本站的一个 GET 页面，再由它做顶层导航跳出去。
+	http.Redirect(w, r, "/oauth/go?state="+url.QueryEscape(p.ID), http.StatusSeeOther)
 }
 
 // ---------- 绑定 ----------
@@ -97,6 +130,10 @@ func (s *Server) handleOAuthAccount(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOAuthBindStart(w http.ResponseWriter, r *http.Request) {
 	admin := adminFrom(r)
+	if err := r.ParseForm(); err != nil || !s.checkCSRF(r, s.csrfFor(r)) {
+		http.Error(w, "页面已过期", http.StatusBadRequest)
+		return
+	}
 	if !s.cfg.OAuth.Enabled {
 		s.flashRedirect(w, r, "/account/oauth", "后台没有启用 OAuth2")
 		return
