@@ -25,12 +25,18 @@ type Report struct {
 	UAHashCount   int
 	Score         int
 	Level         string // low | medium | high
-	Reasons       []string
-	Times         []time.Time
-	PollIDs       []int64
+	// 跨 IP 信号：单个 IP 的票数可以伪装，但"同一个 UA 出现在多个 IP"、
+	// "同一 /24 突然集中投票" 这类行为很难同时伪装。
+	SharedUA     int // 使用同一个 UA 的不同 IP 数（取该 IP 上最大的那个）
+	SubnetVotes  int // 同 /24 网段在 subnet_window 内的票数
+	SubnetMinute int // 该网段 60 秒内的峰值票数
+	Reasons      []string
+	Times        []time.Time
+	PollIDs      []int64
 }
 
 type agg struct {
+	ip    []byte
 	text  string
 	times []time.Time
 	polls map[int64]bool
@@ -45,7 +51,7 @@ func Evaluate(votes []store.Vote, cfg config.Risk) []Report {
 		key := string(v.IP)
 		a, ok := byIP[key]
 		if !ok {
-			a = &agg{text: v.IPText, polls: map[int64]bool{}, uas: map[string]bool{}}
+			a = &agg{ip: v.IP, text: v.IPText, polls: map[int64]bool{}, uas: map[string]bool{}}
 			byIP[key] = a
 		}
 		a.times = append(a.times, v.CreatedAt)
@@ -58,6 +64,22 @@ func Evaluate(votes []store.Vote, cfg config.Risk) []Report {
 		}
 	}
 
+	// UA → 使用它的不同 IP 数
+	uaIPs := make(map[string]map[string]bool)
+	// /24 → 票时间
+	subnetTimes := make(map[string][]time.Time)
+	for _, a := range byIP {
+		for ua := range a.uas {
+			set, ok := uaIPs[ua]
+			if !ok {
+				set = make(map[string]bool)
+				uaIPs[ua] = set
+			}
+			set[string(a.ip)] = true
+		}
+		subnetTimes[subnet24(a.ip)] = append(subnetTimes[subnet24(a.ip)], a.times...)
+	}
+
 	out := make([]Report, 0, len(byIP))
 	for _, a := range byIP {
 		r := Report{
@@ -67,6 +89,16 @@ func Evaluate(votes []store.Vote, cfg config.Risk) []Report {
 		}
 		if r.IP == "" {
 			r.IP = "(未知)"
+		}
+		for ua := range a.uas {
+			if n := len(uaIPs[ua]); n > r.SharedUA {
+				r.SharedUA = n
+			}
+		}
+		if st := subnetTimes[subnet24(a.ip)]; len(st) > 0 {
+			sort.Slice(st, func(i, j int) bool { return st[i].Before(st[j]) })
+			r.SubnetVotes = len(st)
+			r.SubnetMinute = peakPerMinute(st)
 		}
 		r.PeakPerMinute = peakPerMinute(a.times)
 		r.IntervalCV = intervalCV(a.times)
@@ -127,15 +159,48 @@ func intervalCV(times []time.Time) float64 {
 	return math.Sqrt(sq/float64(len(intervals))) / mean
 }
 
+// subnet24 取 IPv4 的前 3 字节（IPv4-mapped IPv6 取最后 4 字节）用于 /24 聚合。
+func subnet24(ip []byte) string {
+	if len(ip) == 16 {
+		return "24:" + string(ip[13:16])
+	}
+	if len(ip) >= 3 {
+		return "24:" + string(ip[:3])
+	}
+	return "24:" + string(ip)
+}
+
+func levelFor(score int) string {
+	switch {
+	case score >= 6:
+		return "high"
+	case score >= 3:
+		return "medium"
+	}
+	return "low"
+}
+
 func score(r *Report, cfg config.Risk) {
 	add := func(points int, reason string) {
 		r.Score += points
 		r.Reasons = append(r.Reasons, reason)
 	}
+
+	// 跨 IP 信号放在最前面：它们和"这个 IP 投了几票"无关。
+	// 分布式刷票每个 IP 只投一票，如果先按 min_votes 一刀切掉，
+	// 就正好放过最典型的那种攻击。
+	if cfg.SharedUA > 0 && r.SharedUA >= cfg.SharedUA {
+		add(3, "同一个 UA 出现在 "+strconv.Itoa(r.SharedUA)+" 个 IP 上（阈值 "+strconv.Itoa(cfg.SharedUA)+"）")
+	}
+	if cfg.SubnetVotes > 0 && r.SubnetVotes >= cfg.SubnetVotes {
+		add(3, "同 /24 网段共 "+strconv.Itoa(r.SubnetVotes)+" 票，60 秒峰值 "+strconv.Itoa(r.SubnetMinute))
+	}
+
 	if r.Votes < cfg.MinVotes {
-		r.Level = "low"
+		r.Level = levelFor(r.Score)
 		return
 	}
+
 	if r.Votes >= cfg.VolumeHigh {
 		add(5, "票数 "+strconv.Itoa(r.Votes)+"（阈值 "+strconv.Itoa(cfg.VolumeHigh)+"）")
 	} else if r.Votes >= cfg.VolumeWarn {
@@ -153,15 +218,8 @@ func score(r *Report, cfg config.Risk) {
 	if r.UAHashCount >= cfg.UAChange {
 		add(2, "同一 IP 出现 "+strconv.Itoa(r.UAHashCount)+" 个不同 UA")
 	}
-	if r.UAHashCount == 0 && r.Votes >= cfg.MinVotes {
-		add(1, "全部投票没有 UA（疑似脚本）")
+	if r.UAHashCount == 0 {
+		add(1, "没有 UA（疑似脚本）")
 	}
-	switch {
-	case r.Score >= 6:
-		r.Level = "high"
-	case r.Score >= 3:
-		r.Level = "medium"
-	default:
-		r.Level = "low"
-	}
+	r.Level = levelFor(r.Score)
 }

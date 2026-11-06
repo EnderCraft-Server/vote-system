@@ -80,6 +80,8 @@ type Risk struct {
 	PollSpread     int      `yaml:"poll_spread"`
 	RegularityCV   float64  `yaml:"regularity_cv"`
 	UAChange       int      `yaml:"ua_change"`
+	SharedUA       int      `yaml:"shared_ua"`
+	SubnetVotes    int      `yaml:"subnet_votes"`
 }
 
 // OAuth 是"危险操作二次授权"用的 OAuth2 客户端配置。
@@ -172,12 +174,14 @@ func Default() *Config {
 		Risk: Risk{
 			Window:         Duration{24 * time.Hour},
 			MinVotes:       3,
-			VolumeWarn:     10,
-			VolumeHigh:     30,
-			BurstPerMinute: 5,
-			PollSpread:     3,
-			RegularityCV:   0.15,
-			UAChange:       3,
+			VolumeWarn:     5,
+			VolumeHigh:     12,
+			BurstPerMinute: 3,
+			PollSpread:     2,
+			RegularityCV:   0.25,
+			UAChange:       2,
+			SharedUA:       3,
+			SubnetVotes:    8,
 		},
 		OAuth: OAuth{
 			Enabled:            false,
@@ -324,6 +328,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Risk.BurstPerMinute <= 0 || c.Risk.PollSpread <= 0 || c.Risk.UAChange <= 0 {
 		add("risk.burst_per_minute / poll_spread / ua_change 需 > 0")
+	}
+	if c.Risk.SharedUA <= 0 || c.Risk.SubnetVotes <= 0 {
+		add("risk.shared_ua / subnet_votes 需 > 0")
 	}
 	if c.OAuth.Enabled {
 		if c.OAuth.AuthorizeURL == "" || c.OAuth.TokenURL == "" || c.OAuth.UserinfoURL == "" {
