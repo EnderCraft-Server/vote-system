@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -102,6 +103,37 @@ func newOAuthTestServer(t *testing.T) (*Server, *memory.Store, *mockProvider) {
 	return srv, st, mp
 }
 
+// followGo 跟随 /oauth/go 这一跳，返回 provider 授权地址里的 state。
+func followGo(t *testing.T, h http.Handler, loc string) string {
+	t.Helper()
+	if !strings.HasPrefix(loc, "/oauth/go?state=") {
+		t.Fatalf("应先跳到同源的 /oauth/go，实际 %s", loc)
+	}
+	rec := do(t, h, "GET", loc, nil, nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/oauth/go 应 200（含 meta refresh），得到 %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "http-equiv=\"refresh\"") {
+		t.Fatalf("/oauth/go 页面应包含 meta refresh：%s", body[:200])
+	}
+	m := regexp.MustCompile(`url=(http[^"']*authorize[^"']*)`).FindStringSubmatch(body)
+	if len(m) < 2 {
+		t.Fatalf("页面里没有 provider 地址：%s", body[:400])
+	}
+	// html/template 会把属性里的 & 和 + 转成实体，浏览器会解码；测试里也要解码。
+	raw := strings.NewReplacer("&amp;", "&", "&#43;", "+", "&#34;", "\"", "&#39;", "'").Replace(m[1])
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("解析 provider 地址失败：%v", err)
+	}
+	st := u.Query().Get("state")
+	if st == "" {
+		t.Fatalf("页面里的 provider 地址没有 state：%s", raw)
+	}
+	return st
+}
+
 func stateOf(t *testing.T, loc string) string {
 	t.Helper()
 	u, err := url.Parse(loc)
@@ -151,7 +183,7 @@ func TestOAuthBindThenDeleteByIP(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("应跳转到 provider，得到 %d", rec.Code)
 	}
-	state := stateOf(t, rec.Header().Get("Location"))
+	state := followGo(t, h, rec.Header().Get("Location"))
 	rec = do(t, h, "GET", "/oauth/callback?code=abc&state="+state, nil, nil, false)
 	if !strings.Contains(rec.Body.String(), "已完成绑定") {
 		t.Fatalf("绑定应成功：%s", rec.Body.String())
@@ -177,7 +209,7 @@ func TestOAuthBindThenDeleteByIP(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("应跳转授权，得到 %d", rec.Code)
 	}
-	state = stateOf(t, rec.Header().Get("Location"))
+	state = followGo(t, h, rec.Header().Get("Location"))
 
 	// 未授权前不能删
 	if n, _ := st.CountVotes(context.Background(), p.ID); n != 4 {
@@ -225,7 +257,7 @@ func TestOAuthSubjectMismatchRejected(t *testing.T) {
 	rec = do(t, h, "POST", "/super/danger/delete-poll", url.Values{
 		"csrf": {csrf}, "poll_id": {fmt.Sprint(p.ID)}, "confirm": {"on"},
 	}, []*http.Cookie{cookie}, false)
-	state := stateOf(t, rec.Header().Get("Location"))
+	state := followGo(t, h, rec.Header().Get("Location"))
 	rec = do(t, h, "GET", "/oauth/callback?code=abc&state="+state, nil, nil, false)
 	if !strings.Contains(rec.Body.String(), "不一致") {
 		t.Fatalf("身份不一致应拒绝：%s", rec.Body.String())
@@ -256,7 +288,7 @@ func TestDeletePollWithVotesViaOAuth(t *testing.T) {
 	rec = do(t, h, "POST", "/super/danger/delete-poll", url.Values{
 		"csrf": {csrf}, "poll_id": {fmt.Sprint(p.ID)}, "confirm": {"on"},
 	}, []*http.Cookie{cookie}, false)
-	state := stateOf(t, rec.Header().Get("Location"))
+	state := followGo(t, h, rec.Header().Get("Location"))
 	rec = do(t, h, "GET", "/oauth/callback?code=abc&state="+state, nil, nil, false)
 	if !strings.Contains(rec.Body.String(), "已删除投票") {
 		t.Fatalf("应删除成功：%s", rec.Body.String())
