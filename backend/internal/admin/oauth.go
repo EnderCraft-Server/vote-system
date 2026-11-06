@@ -151,7 +151,13 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	code := strings.TrimSpace(r.URL.Query().Get("code"))
 	state := strings.TrimSpace(r.URL.Query().Get("state"))
 	if e := r.URL.Query().Get("error"); e != "" {
-		s.renderOAuthDone(w, r, false, "授权被拒绝："+e)
+		desc := r.URL.Query().Get("error_description")
+		s.log.Warn("provider 拒绝了授权", "error", e, "description", desc)
+		msg := "授权被拒绝：" + e
+		if desc != "" {
+			msg += "（" + desc + "）"
+		}
+		s.renderOAuthDone(w, r, false, msg)
 		return
 	}
 	if code == "" || state == "" {
