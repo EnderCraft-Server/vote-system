@@ -149,7 +149,9 @@ $resultsVisible = !empty($poll['results_visible']);
         <?php endforeach; ?>
 
         <?php if ($pow !== null): ?>
-          <section class="pow" data-pow="<?= e(json_encode($pow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>">
+          <section class="pow"
+         data-pow="<?= e(json_encode($pow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>"
+         data-pow-worker="<?= e(asset('assets/pow-worker.js')) ?>">
             <h2 class="captcha-title"><?= e(t('pow.title')) ?></h2>
             <p class="q-note pow-status" data-pow-status aria-live="polite"><?= e(t('pow.pending')) ?></p>
             <p class="q-note"><?= e(t('pow.hint')) ?></p>
