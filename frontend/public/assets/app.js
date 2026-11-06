@@ -85,14 +85,15 @@
       if (submit) submit.disabled = false;
     }
 
-    if (!window.Worker || !window.crypto || !crypto.subtle) {
+    if (!window.Worker) {
       setStatus("浏览器不支持人机校验，请换用较新的浏览器。", true);
       return;
     }
 
     var worker;
     try {
-      worker = new Worker("/assets/pow-worker.js");
+      var workerURL = box.getAttribute("data-pow-worker") || "/assets/pow-worker.js";
+      worker = new Worker(workerURL);
     } catch (e) {
       setStatus("人机校验启动失败，请刷新页面重试。", true);
       return;

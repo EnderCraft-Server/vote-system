@@ -74,11 +74,11 @@ captcha:
   # 只能靠算力换答案；再配合"申请越多难度越高"，批量自动化的成本会迅速失控。
   pow:
     enabled: true
-    base_bits: 18                     # 初始难度（18 ≈ 26 万次 SHA-256，浏览器约 0.3s）
-    max_bits: 24                      # 上限（24 ≈ 1600 万次；正常用户永远到不了）
-    escalate_every: 3                 # 同一 IP 每申请 3 次，难度 +1 bit
-    ttl: 5m
+    base_bits: 17          # 2^17≈13 万次哈希：桌面约 40ms，手机约 0.2s
+    max_bits: 21           # 2^21≈210 万次：桌面约 0.6s，手机约 3.5s
+    escalate_every: 3      # 同一 IP 每 3 次申请提高 1 位
     window: 10m
+    ttl: 5m
   ttl: 5m                             # 有效期
   max_attempts: 5                     # 同一验证码最多尝试次数
   create_per_ip_per_minute: 10         # 每 IP 每分钟可申请次数
