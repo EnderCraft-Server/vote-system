@@ -136,24 +136,25 @@ oauth:
 > 那么 `authorize_url` 也必须写 `127.0.0.1`，否则登录后的会话 Cookie 不会带回来，表现为"登录完又回到登录页"。解绑只能走服务器控制台
 `unbind oauth <用户名>` 或启动参数 `voted -unbind-oauth <用户名>`。
 
-## 5. 建管理员
+## 5. 建第一个管理员
 
-后台**不会**自动创建管理员（`demo.seed` 只在内存模式生效）。两种方式：
+后台**不会**自动创建管理员（`demo.seed` 只在内存模式下生效）。第一次启动时日志会提示：
 
-1. 用 SQL 插入（bcrypt 哈希需要现算）：
+~~~text
+level=WARN msg="数据库里还没有管理员：请在下面的控制台执行 create admin <用户名>，会打印一次性密码"
+投票后台控制台。help 查看命令，quit 退出控制台（后台继续运行）。
+> create admin admin
+已创建管理员 admin
+一次性密码：K7fQ2mZx9pRt4vWy3nHc
+（只显示这一次，请立刻保存；登录后到「账号」页修改。）
+~~~
 
-```bash
-php -r 'echo password_hash("换成强密码", PASSWORD_BCRYPT, ["cost" => 12]), PHP_EOL;'
-```
-
-```sql
-INSERT INTO admins (username, password_hash, display_name)
-VALUES ('admin', '$2y$12$....', '管理员');
-```
-
-   Go 的 bcrypt 与 PHP 的 `$2y$` 前缀互相兼容。
-
-2. 或者在开发环境先 `driver: memory, demo.seed: true` 跑一次，把 `admins` 表里的哈希拷过去。
+- 密码是 20 位随机串，只在控制台打印一次，**不进日志、不落盘**（库里只有 bcrypt）。
+- 忘记密码：同一控制台执行 `reset password <用户名>`，同样打印一次性新密码。
+- 控制台不可用（systemd 下 stdin 是 /dev/null）时，用一次性参数或临时前台启动：
+  ~~~bash
+  ./voted -config /etc/vote-system/backend.yaml      # 前台运行，能拿到控制台
+  ~~~
 
 ## 6. 上线自查
 
