@@ -293,6 +293,27 @@ func (s *Store) PollIPStats(_ context.Context, pollID int64, limit int) ([]store
 	return out, nil
 }
 
+func (s *Store) VotesSince(_ context.Context, since time.Time, limit int) ([]store.Vote, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 5000
+	}
+	var out []store.Vote
+	for _, list := range s.votes {
+		for _, v := range list {
+			if !v.CreatedAt.Before(since) {
+				out = append(out, v)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (s *Store) CountVotesByIP(_ context.Context, pollID int64, ip []byte) (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

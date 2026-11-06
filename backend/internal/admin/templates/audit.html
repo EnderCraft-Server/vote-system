@@ -3,7 +3,55 @@
 {{template "nav" .}}
 <main class="page">
   <div class="page-head"><h1>审计日志</h1></div>
-  <p class="muted">记录登录、投票/题目变更、IP 规则与管理员操作，最多显示最近 300 条。</p>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>IP 投票统计与风控</h2>
+      <span class="muted small">最近 {{.Data.Window}}，共扫描 {{.Data.Scanned}} 张票；点 IP 展开每一票的时间</span>
+    </div>
+    <p class="muted small">判定规则见 docs/RISK-CONTROL.md。分数越高越可疑；系统只做提示，不自动拦截。</p>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>IP（展开看明细）</th>
+          <th class="num">票数</th>
+          <th class="num">60s 峰值</th>
+          <th class="num">涉及投票</th>
+          <th class="num">间隔 CV</th>
+          <th>风险</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Data.Risk}}
+        <tr>
+          <td class="mono">
+            <details>
+              <summary>{{.IP}}</summary>
+              <ul class="feed">
+                {{range .Times}}<li class="mono">{{fmtDateTime .}}</li>{{end}}
+              </ul>
+            </details>
+          </td>
+          <td class="num">{{.Votes}}</td>
+          <td class="num">{{.PeakPerMinute}}</td>
+          <td class="num">{{.Polls}}</td>
+          <td class="num">{{if lt .IntervalCV 0.0}}—{{else}}{{printf "%.2f" .IntervalCV}}{{end}}</td>
+          <td>
+            {{if eq .Level "high"}}<span class="tag tag-closed">高 {{.Score}}</span>
+            {{else if eq .Level "medium"}}<span class="tag tag-warn">中 {{.Score}}</span>
+            {{else}}<span class="tag tag-open">低 {{.Score}}</span>{{end}}
+            {{if .Reasons}}<div class="muted small">{{range $i, $r := .Reasons}}{{if $i}}；{{end}}{{$r}}{{end}}</div>{{end}}
+          </td>
+        </tr>
+      {{else}}
+        <tr><td colspan="6" class="empty">最近 {{.Data.Window}} 没有投票</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="page-head"><h1>操作日志</h1></div>
+  <p class="muted">登录、投票/题目变更、IP 规则、管理员操作、删除与绑定，最多显示最近 300 条。</p>
   <table class="table compact">
     <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th><th>来源 IP</th><th>说明</th></tr></thead>
     <tbody>

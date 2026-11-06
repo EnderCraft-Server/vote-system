@@ -26,6 +26,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/EnderCraft-Server/vote-system/backend/internal/config"
+	"github.com/EnderCraft-Server/vote-system/backend/internal/risk"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/store"
 	"github.com/EnderCraft-Server/vote-system/backend/internal/vote"
 )
@@ -798,8 +799,33 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, "audit", http.StatusInternalServerError, "读取审计日志失败", pageData{Admin: admin, CSRF: s.csrfFor(r)})
 		return
 	}
+	window := s.cfg.Risk.Window.Duration
+	if window <= 0 {
+		window = 24 * time.Hour
+	}
+	votes, err := s.st.VotesSince(r.Context(), s.now().Add(-window), 5000)
+	if err != nil {
+		s.log.Warn("读取投票用于风控失败", "err", err)
+	}
+	reports := risk.Evaluate(votes, s.cfg.Risk)
 	s.render(w, r, "audit", pageData{Title: "审计日志", Nav: "audit", Admin: admin, CSRF: s.csrfFor(r),
-		Data: map[string]any{"Logs": logs}})
+		Data: map[string]any{
+			"Logs":    logs,
+			"Risk":    reports,
+			"Window":  humanWindow(window),
+			"Scanned": len(votes),
+		}})
+}
+
+func humanWindow(d time.Duration) string {
+	switch {
+	case d >= 24*time.Hour && d%(24*time.Hour) == 0:
+		return strconv.Itoa(int(d/(24*time.Hour))) + " 天"
+	case d >= time.Hour && d%time.Hour == 0:
+		return strconv.Itoa(int(d/time.Hour)) + " 小时"
+	default:
+		return d.String()
+	}
 }
 
 // ---------- 账号 ----------

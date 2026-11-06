@@ -205,6 +205,8 @@ type Store interface {
 	ListVotes(ctx context.Context, pollID int64, limit int) ([]Vote, error)
 	// PollIPStats 按 IP 聚合该投票的票数，按票数降序。
 	PollIPStats(ctx context.Context, pollID int64, limit int) ([]IPStat, error)
+	// VotesSince 返回 since 之后的所有票（跨投票），供风控聚合。
+	VotesSince(ctx context.Context, since time.Time, limit int) ([]Vote, error)
 	// CountVotesByIP 返回某投票里该 IP 的票数（删除前预览）。
 	CountVotesByIP(ctx context.Context, pollID int64, ip []byte) (int, error)
 	// DeleteVotesByIP 删除某投票里该 IP 的全部票（答案级联删除），返回删除条数。

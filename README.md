@@ -86,6 +86,7 @@ php -S 127.0.0.1:8080 -t public dev-router.php
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | TCP 帧格式、签名算法、方法表 |
 | [docs/DESIGN.md](docs/DESIGN.md) | 前台视觉规范（配色、字体、玻璃层级） |
 | [docs/SECURITY.md](docs/SECURITY.md) | 威胁模型与逐项防护 |
+| [docs/RISK-CONTROL.md](docs/RISK-CONTROL.md) | 风控指标（票数/峰值/节奏/UA）、打分与阈值 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署、配置、升级、排错 |
 
 ## 约定

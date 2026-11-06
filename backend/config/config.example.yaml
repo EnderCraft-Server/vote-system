@@ -38,6 +38,17 @@ security:
   admin_login_lockout: 15m
   admin_bcrypt_cost: 12
 
+# 风控：只统计最近 window 内的票，按 IP 聚合打分（规则见 docs/RISK-CONTROL.md）
+risk:
+  window: 24h
+  min_votes: 3              # 少于这个票数不参与打分
+  volume_warn: 10           # 该 IP 票数达到这里 +3
+  volume_high: 30           # 达到这里 +5（并且直接判"高"）
+  burst_per_minute: 5       # 任意 60 秒内 >=5 票 +4
+  poll_spread: 3            # 跨 >=3 个投票 +2
+  regularity_cv: 0.15       # 票间隔的变异系数低于它 +3（机器节奏）
+  ua_change: 3              # 同一 IP 出现 >=3 个不同 UA +2
+
 # 危险操作（删票/删投票）的二次授权。开启后不再使用 TOTP，
 # 而是让管理员用外部 OAuth2 身份重新授权一次（Authorization Code 模式）。
 oauth:

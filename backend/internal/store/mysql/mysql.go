@@ -410,6 +410,27 @@ func (s *Store) PollIPStats(ctx context.Context, pollID int64, limit int) ([]sto
 	return out, rows.Err()
 }
 
+func (s *Store) VotesSince(ctx context.Context, since time.Time, limit int) ([]store.Vote, error) {
+	if limit <= 0 {
+		limit = 5000
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id, poll_id, ip, ip_text, ua_hash, receipt, created_at
+		FROM votes WHERE created_at >= ? ORDER BY created_at ASC LIMIT ?`, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.Vote
+	for rows.Next() {
+		var v store.Vote
+		if err := rows.Scan(&v.ID, &v.PollID, &v.IP, &v.IPText, &v.UAHash, &v.Receipt, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) CountVotesByIP(ctx context.Context, pollID int64, ip []byte) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM votes WHERE poll_id = ? AND ip = ?", pollID, ip).Scan(&n)
