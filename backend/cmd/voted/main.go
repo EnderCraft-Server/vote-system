@@ -31,7 +31,7 @@ const version = "0.1.0"
 func main() {
 	configPath := flag.String("config", "./config/config.yaml", "配置文件路径")
 	showVersion := flag.Bool("version", false, "打印版本号后退出")
-	unbindTOTP := flag.String("unbind-totp", "", "解绑指定管理员的 authenticator 后退出（systemd 下用，控制台不可交互时）")
+	unbindOAuth := flag.String("unbind-oauth", "", "解绑指定管理员的外部身份后退出（systemd 下用，控制台不可交互时）")
 	flag.Parse()
 
 	if *showVersion {
@@ -65,25 +65,25 @@ func main() {
 		}
 	}
 
-	if *unbindTOTP != "" {
-		admin, err := st.GetAdminByUsername(context.Background(), *unbindTOTP)
+	if *unbindOAuth != "" {
+		admin, err := st.GetAdminByUsername(context.Background(), *unbindOAuth)
 		if err != nil {
-			log.Error("找不到该管理员", "username", *unbindTOTP)
+			log.Error("找不到该管理员", "username", *unbindOAuth)
 			os.Exit(1)
 		}
-		if admin.TOTPSecret == "" {
-			log.Warn("该管理员尚未绑定 authenticator", "username", *unbindTOTP)
+		if admin.OAuthSubject == "" {
+			log.Warn("该管理员尚未绑定外部身份", "username", *unbindOAuth)
 			return
 		}
-		if err := st.ClearAdminTOTP(context.Background(), admin.ID); err != nil {
+		if err := st.ClearAdminOAuth(context.Background(), admin.ID); err != nil {
 			log.Error("解绑失败", "err", err)
 			os.Exit(1)
 		}
 		_ = st.AddAudit(context.Background(), &store.AuditEntry{
-			Actor: "console", Action: "totp_unbind", Target: "admin:" + *unbindTOTP,
-			IPText: "local", Detail: "启动参数 -unbind-totp",
+			Actor: "console", Action: "oauth_unbind", Target: "admin:" + *unbindOAuth,
+			IPText: "local", Detail: "启动参数 -unbind-oauth",
 		})
-		log.Warn("已解绑 authenticator", "username", *unbindTOTP)
+		log.Warn("已解绑外部身份", "username", *unbindOAuth)
 		return
 	}
 

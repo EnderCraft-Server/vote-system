@@ -527,21 +527,26 @@ func (s *Store) DeleteIPRule(ctx context.Context, id int64) error {
 	return nil
 }
 
-const adminColumns = "id, username, password_hash, display_name, is_active, failed_logins, locked_until, last_login_at, last_login_ip, created_at, totp_secret, totp_bound_at, totp_last_step"
+const adminColumns = "id, username, password_hash, display_name, is_active, failed_logins, locked_until, last_login_at, last_login_ip, created_at, totp_secret, totp_bound_at, totp_last_step, oauth_subject, oauth_email, oauth_bound_at"
 
 func scanAdmin(row scannable) (*store.Admin, error) {
 	var (
-		a                         store.Admin
-		locked, lastLogin, totpAt sql.NullTime
+		a                                  store.Admin
+		locked, lastLogin, totpAt, oauthAt sql.NullTime
 	)
 	if err := row.Scan(&a.ID, &a.Username, &a.PasswordHash, &a.DisplayName, &a.Active,
 		&a.FailedLogins, &locked, &lastLogin, &a.LastLoginIP, &a.CreatedAt,
-		&a.TOTPSecret, &totpAt, &a.TOTPLastStep); err != nil {
+		&a.TOTPSecret, &totpAt, &a.TOTPLastStep,
+		&a.OAuthSubject, &a.OAuthEmail, &oauthAt); err != nil {
 		return nil, wrap(err)
 	}
 	if totpAt.Valid {
 		t := totpAt.Time
 		a.TOTPBoundAt = &t
+	}
+	if oauthAt.Valid {
+		t := oauthAt.Time
+		a.OAuthBoundAt = &t
 	}
 	if locked.Valid {
 		t := locked.Time
@@ -648,6 +653,16 @@ func (s *Store) ClearAdminTOTP(ctx context.Context, id int64) error {
 
 func (s *Store) UpdateAdminTOTPStep(ctx context.Context, id int64, step int64) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE admins SET totp_last_step = ? WHERE id = ?", step, id)
+	return err
+}
+
+func (s *Store) SetAdminOAuth(ctx context.Context, id int64, subject, email string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE admins SET oauth_subject = ?, oauth_email = ?, oauth_bound_at = ? WHERE id = ?", subject, email, at, id)
+	return err
+}
+
+func (s *Store) ClearAdminOAuth(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE admins SET oauth_subject = '', oauth_email = '', oauth_bound_at = NULL WHERE id = ?", id)
 	return err
 }
 

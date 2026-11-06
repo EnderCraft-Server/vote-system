@@ -3,7 +3,7 @@
 // 为什么需要它：TOTP 绑定之后不允许自助解绑（防止账号被盗的人换绑自己的手机），
 // 解绑只能由"能登到服务器上的人"执行 —— 也就是这条命令：
 //
-//	unbind totp <username>
+//	unbind oauth <username>
 //
 // 注意：用 systemd 托管时进程的 stdin 是 /dev/null，控制台不可用；
 // 这种情况下请用一次性参数：voted -unbind-totp <username>。
@@ -73,7 +73,7 @@ func (c *Console) Exec(ctx context.Context, line string) error {
 		c.printf("%s\n", strings.Join([]string{
 			"可用命令：",
 			"  list admins                 列出管理员及 TOTP 绑定状态",
-			"  unbind totp <username>      解绑某管理员的 authenticator（解绑后需重新绑定）",
+			"  unbind oauth <username>     解绑某管理员绑定的外部身份（解绑后需重新绑定）",
 			"  help                        显示本帮助",
 			"  quit                        退出控制台（后台继续运行）",
 		}, "\n"))
@@ -87,51 +87,51 @@ func (c *Console) Exec(ctx context.Context, line string) error {
 		if err != nil {
 			return err
 		}
-		c.printf("%-24s %-6s %-10s %s\n", "用户名", "状态", "TOTP", "上次登录")
+		c.printf("%-24s %-6s %-10s %s\n", "用户名", "状态", "外部身份", "上次登录")
 		for _, a := range admins {
 			state := "禁用"
 			if a.Active {
 				state = "启用"
 			}
-			totpState := "未绑定"
-			if a.TOTPSecret != "" {
-				totpState = "已绑定"
+			oauthState := "未绑定"
+			if a.OAuthSubject != "" {
+				oauthState = "已绑定"
 			}
 			last := "-"
 			if a.LastLoginAt != nil {
 				last = a.LastLoginAt.Format("2006-01-02 15:04")
 			}
-			c.printf("%-24s %-6s %-10s %s\n", a.Username, state, totpState, last)
+			c.printf("%-24s %-6s %-10s %s\n", a.Username, state, oauthState, last)
 		}
 		return nil
 
 	case "unbind":
-		if len(fields) != 3 || fields[1] != "totp" {
-			return fmt.Errorf("用法：unbind totp <username>")
+		if len(fields) != 3 || fields[1] != "oauth" {
+			return fmt.Errorf("用法：unbind oauth <username>")
 		}
-		return c.unbindTOTP(ctx, fields[2])
+		return c.unbindOAuth(ctx, fields[2])
 	}
 	return fmt.Errorf("未知命令 %q（输入 help 查看）", fields[0])
 }
 
-func (c *Console) unbindTOTP(ctx context.Context, username string) error {
+func (c *Console) unbindOAuth(ctx context.Context, username string) error {
 	admin, err := c.st.GetAdminByUsername(ctx, username)
 	if err != nil {
 		return fmt.Errorf("找不到管理员 %q", username)
 	}
-	if admin.TOTPSecret == "" {
-		return fmt.Errorf("管理员 %q 尚未绑定 authenticator", username)
+	if admin.OAuthSubject == "" {
+		return fmt.Errorf("管理员 %q 尚未绑定外部身份", username)
 	}
-	if err := c.st.ClearAdminTOTP(ctx, admin.ID); err != nil {
+	if err := c.st.ClearAdminOAuth(ctx, admin.ID); err != nil {
 		return err
 	}
 	if err := c.st.AddAudit(ctx, &store.AuditEntry{
-		Actor: "console", Action: "totp_unbind", Target: "admin:" + username,
-		IPText: "local", Detail: "后台控制台执行 unbind totp",
+		Actor: "console", Action: "oauth_unbind", Target: "admin:" + username,
+		IPText: "local", Detail: "后台控制台执行 unbind oauth",
 	}); err != nil {
-		c.log.Warn("写审计失败", "action", "totp_unbind", "err", err)
+		c.log.Warn("写审计失败", "action", "oauth_unbind", "err", err)
 	}
-	c.log.Warn("已解绑 TOTP，请尽快重新绑定", "username", username)
-	c.printf("已解绑 %s 的 authenticator。该账号下次需要重新绑定后才能执行危险操作。\n", username)
+	c.log.Warn("已解绑外部身份，请尽快重新绑定", "username", username)
+	c.printf("已解绑 %s 的外部身份。该账号下次需要重新绑定后才能执行危险操作。\n", username)
 	return nil
 }

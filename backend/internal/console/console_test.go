@@ -23,26 +23,26 @@ func setup(t *testing.T) (*Console, *memory.Store, *bytes.Buffer) {
 	return NewWith(st, slog.New(slog.NewTextHandler(io.Discard, nil)), strings.NewReader(""), &out), st, &out
 }
 
-func TestUnbindTOTP(t *testing.T) {
+func TestUnbindOAuth(t *testing.T) {
 	c, st, out := setup(t)
 	ctx := context.Background()
 	admin, _ := st.GetAdminByUsername(ctx, "alice")
-	if err := st.SetAdminTOTP(ctx, admin.ID, "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", time.Now()); err != nil {
+	if err := st.SetAdminOAuth(ctx, admin.ID, "sso-user-1", "alice@example.com", time.Now()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := c.Exec(ctx, "unbind totp alice"); err != nil {
+	if err := c.Exec(ctx, "unbind oauth alice"); err != nil {
 		t.Fatalf("解绑应成功：%v", err)
 	}
 	after, _ := st.GetAdminByUsername(ctx, "alice")
-	if after.TOTPSecret != "" || after.TOTPBoundAt != nil {
+	if after.OAuthSubject != "" || after.OAuthBoundAt != nil {
 		t.Fatalf("解绑后不应还有密钥：%+v", after)
 	}
 	if !strings.Contains(out.String(), "已解绑") {
 		t.Fatalf("没有输出提示：%q", out.String())
 	}
 	logs, err := st.ListAudit(ctx, 10)
-	if err != nil || len(logs) == 0 || logs[0].Action != "totp_unbind" || logs[0].Actor != "console" {
+	if err != nil || len(logs) == 0 || logs[0].Action != "oauth_unbind" || logs[0].Actor != "console" {
 		t.Fatalf("应写审计：%v %+v", err, logs)
 	}
 }
@@ -50,10 +50,10 @@ func TestUnbindTOTP(t *testing.T) {
 func TestUnbindErrors(t *testing.T) {
 	c, st, _ := setup(t)
 	ctx := context.Background()
-	if err := c.Exec(ctx, "unbind totp nobody"); err == nil {
+	if err := c.Exec(ctx, "unbind oauth nobody"); err == nil {
 		t.Fatal("不存在的用户应报错")
 	}
-	if err := c.Exec(ctx, "unbind totp alice"); err == nil {
+	if err := c.Exec(ctx, "unbind oauth alice"); err == nil {
 		t.Fatal("未绑定时应报错")
 	}
 	if err := c.Exec(ctx, "unbind alice"); err == nil {

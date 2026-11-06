@@ -101,6 +101,37 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
 ```
 
+## 4.5 危险操作的 OAuth2（可选但建议）
+
+删除票 / 删除有票的投票需要外部身份授权。在 provider 里注册一个 OAuth2 客户端：
+
+| 项 | 值 |
+| --- | --- |
+| 回调地址 | `https://admin.vote.example.com/oauth/callback` |
+| 授权模式 | Authorization Code |
+| Scope | `openid profile email`（按 provider 要求调整） |
+
+后台配置：
+
+```yaml
+oauth:
+  enabled: true
+  authorize_url: "https://sso.example.com/oauth2/authorize"
+  token_url: "https://sso.example.com/oauth2/token"
+  userinfo_url: "https://sso.example.com/oauth2/userinfo"
+  client_id: "vote-admin"
+  client_secret: "…"
+  redirect_uri: "https://admin.vote.example.com/oauth/callback"
+  scopes: ["openid", "profile", "email"]
+  subject_field: "sub"        # GitHub 用 "id"；Keycloak/Authentik/Auth0 用 "sub"
+  email_field: "email"
+  allowed_email_domains: ["example.com"]
+  pending_ttl: 5m
+```
+
+绑定：后台「账号 → 外部身份授权 → 跳转授权并绑定」。解绑只能走服务器控制台
+`unbind oauth <用户名>` 或启动参数 `voted -unbind-oauth <用户名>`。
+
 ## 5. 建管理员
 
 后台**不会**自动创建管理员（`demo.seed` 只在内存模式生效）。两种方式：

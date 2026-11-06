@@ -31,6 +31,7 @@ type Config struct {
 	Server   Server   `yaml:"server"`
 	Database Database `yaml:"database"`
 	Security Security `yaml:"security"`
+	OAuth    OAuth    `yaml:"oauth"`
 	Captcha  Captcha  `yaml:"captcha"`
 	Limits   Limits   `yaml:"limits"`
 	Demo     Demo     `yaml:"demo"`
@@ -66,6 +67,24 @@ type Security struct {
 	AdminLoginMaxAttempt int      `yaml:"admin_login_max_attempts"`
 	AdminLoginLockout    Duration `yaml:"admin_login_lockout"`
 	AdminBcryptCost      int      `yaml:"admin_bcrypt_cost"`
+}
+
+// OAuth 是"危险操作二次授权"用的 OAuth2 客户端配置。
+// 每个管理员把自己的一次外部身份绑定到账号上，之后删除数据前都要重新走一次授权。
+type OAuth struct {
+	Enabled            bool     `yaml:"enabled"`
+	AuthorizeURL       string   `yaml:"authorize_url"`
+	TokenURL           string   `yaml:"token_url"`
+	UserinfoURL        string   `yaml:"userinfo_url"`
+	ClientID           string   `yaml:"client_id"`
+	ClientSecret       string   `yaml:"client_secret"`
+	RedirectURI        string   `yaml:"redirect_uri"`
+	Scopes             []string `yaml:"scopes"`
+	SubjectField       string   `yaml:"subject_field"`
+	EmailField         string   `yaml:"email_field"`
+	AllowedEmailDomain []string `yaml:"allowed_email_domains"`
+	Timeout            Duration `yaml:"timeout"`
+	PendingTTL         Duration `yaml:"pending_ttl"`
 }
 
 type Captcha struct {
@@ -136,6 +155,15 @@ func Default() *Config {
 			AdminLoginMaxAttempt: 5,
 			AdminLoginLockout:    Duration{15 * time.Minute},
 			AdminBcryptCost:      12,
+		},
+		OAuth: OAuth{
+			Enabled:            false,
+			Scopes:             []string{"openid", "profile", "email"},
+			SubjectField:       "sub",
+			EmailField:         "email",
+			Timeout:            Duration{10 * time.Second},
+			PendingTTL:         Duration{5 * time.Minute},
+			AllowedEmailDomain: nil,
 		},
 		Captcha: Captcha{
 			Enabled:           true,
@@ -263,6 +291,17 @@ func (c *Config) Validate() error {
 		}
 		if c.Captcha.Pow.EscalateEvery < 1 {
 			add("captcha.pow.escalate_every 至少为 1")
+		}
+	}
+	if c.OAuth.Enabled {
+		if c.OAuth.AuthorizeURL == "" || c.OAuth.TokenURL == "" || c.OAuth.UserinfoURL == "" {
+			add("oauth 启用时必须配置 authorize_url / token_url / userinfo_url")
+		}
+		if c.OAuth.ClientID == "" || c.OAuth.ClientSecret == "" {
+			add("oauth 启用时必须配置 client_id / client_secret")
+		}
+		if c.OAuth.RedirectURI == "" {
+			add("oauth 启用时必须配置 redirect_uri（例如 https://admin.example.com/oauth/callback）")
 		}
 	}
 	if c.Security.AdminBcryptCost < 10 || c.Security.AdminBcryptCost > 15 {
