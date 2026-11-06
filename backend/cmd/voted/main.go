@@ -87,6 +87,10 @@ func main() {
 		return
 	}
 
+	if admins, err := st.ListAdmins(context.Background()); err == nil && len(admins) == 0 {
+		log.Warn("数据库里还没有管理员：请在下面的控制台执行 create admin <用户名>，会打印一次性密码")
+	}
+
 	svc := vote.New(st, cfg)
 	rpcServer := rpc.New(rpc.Options{
 		Secret:        []byte(cfg.Security.RPCSecret),
@@ -127,7 +131,7 @@ func main() {
 	log.Info("管理界面已启动", "addr", cfg.Server.AdminListen,
 		"allowed_cidrs", strings.Join(cfg.Server.AdminAllowedCIDRs, ","))
 
-	go console.New(st, log.With("component", "console")).Run(context.Background())
+	go console.New(st, log.With("component", "console"), cfg.Security.AdminBcryptCost).Run(context.Background())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
