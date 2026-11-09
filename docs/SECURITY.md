@@ -143,3 +143,18 @@ POST /super/danger/delete-ip     （已登录 + CSRF + 勾选确认）
 - **pending 一次性 + 5 分钟过期**，state 是随机的 24 字节，猜不到也复用不了。
 - 可选 `oauth.allowed_email_domains` 限定只能是公司域邮箱。
 - 没启用 OAuth2（`oauth.enabled: false`）时，危险操作直接不可用——不会退化成"输密码就能删"。
+
+## 近期修复（代码审计回填）
+
+- **只读题目仍然提交**：管理端"已有票"时改用 `readOnly`，`<select>`/`checkbox` 用同名 hidden 顶替。
+  以前用 `disabled`，控件不随表单提交，服务端解析出 0 道题 → "至少要有一道题目"，标题也存不了。
+- **CSP 下的内联脚本**：删除确认从 `onsubmit` 改成 `data-confirm` + 事件委托；条形图宽度从内联 `style` 改成
+  预生成 `pct-N` 类。CSP 保持 `script-src 'self'; style-src 'self'`，没有放宽。
+- **X-Forwarded-For 取右不取左**：只信任 `trusted_proxies` 内的地址，并从右往左跳过它们，
+  取第一个不可信地址。追加型反代（`$proxy_add_x_forwarded_for`）下，取第一个等于让客户端自己填。
+- **CSRF 密钥**：弱密钥/未配置不再退化成可复算常量，改为"本进程随机 + 明确告警"，重启即失效。
+- **改密吊销会话**：`POST /account/password` 与控制台 `reset password` 会删除该管理员的其它会话。
+- **过期数据清理**：进程内每 10 分钟清理 `captchas`（1 小时前过期）与过期 `admin_sessions`。
+- **时区固定**：新增 `server.timezone`（默认 `Asia/Shanghai`），启动时设置 `time.Local`，
+  避免管理端填的时间按 UTC 解析、按上海时区落库导致整体偏移 8 小时。
+- **管理端暴露校验**：production 下 `admin_listen` 监听全部地址且 `admin_allowed_cidrs` 为空时拒绝启动。

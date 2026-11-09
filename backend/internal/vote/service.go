@@ -488,7 +488,11 @@ func (s *Service) ListPolls(ctx context.Context) ([]PollSummaryView, error) {
 func (s *Service) pollView(ctx context.Context, p *store.Poll, hasVoted bool) PollView {
 	now := s.now()
 	canVote := p.IsOpenAt(now) && !hasVoted
-	visible := p.ShowResults == "always" || (p.ShowResults == "after_vote" && hasVoted)
+	// 关掉"一 IP 一票"时根本没有"这个人投过没有"的概念（hasVoted 恒为 false），
+	// after_vote 会永远不公开——新建投票的默认值正是 after_vote。
+	// 这里明确退化：没有一票一 IP 就没有"投票后可见"的语义，按"立即公开"处理。
+	visible := p.ShowResults == "always" ||
+		(p.ShowResults == "after_vote" && (hasVoted || !s.oneVotePerIP()))
 	return PollView{
 		Slug: p.Slug, Title: p.Title, Summary: p.Summary, Status: p.Status,
 		CanVote: canVote, HasVoted: hasVoted, ResultsVisible: visible,
@@ -720,6 +724,17 @@ func (s *Service) Submit(ctx context.Context, in SubmitInput) (*SubmitResult, er
 		}
 	}
 
+	// 先校验答案结构，再消费验证码：以前顺序反了，用户填错一次就烧掉一张验证码，
+	// 加上每 IP 每分钟只能申请 10 次，手滑几次就得等一分钟。
+	qs, err := s.st.ListQuestions(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	answers, err := s.validateAnswers(qs, in.Answers)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := s.verifyCaptcha(ctx, in.Captcha.ID, in.Captcha.Answer, in.IP, ip); err != nil {
 		return nil, err
 	}
@@ -730,15 +745,6 @@ func (s *Service) Submit(ctx context.Context, in SubmitInput) (*SubmitResult, er
 			}
 			return nil, ErrCaptchaInvalid
 		}
-	}
-
-	qs, err := s.st.ListQuestions(ctx, p.ID)
-	if err != nil {
-		return nil, err
-	}
-	answers, err := s.validateAnswers(qs, in.Answers)
-	if err != nil {
-		return nil, err
 	}
 
 	uaHash := ""

@@ -384,6 +384,21 @@ func (s *Store) ConsumeCaptcha(_ context.Context, id string, at time.Time) (bool
 	return true, nil
 }
 
+func (s *Store) DeleteSessionsByAdmin(_ context.Context, adminID int64, keepTokenHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for hash, sess := range s.sessions {
+		if sess.AdminID != adminID {
+			continue
+		}
+		if keepTokenHash != "" && hash == keepTokenHash {
+			continue
+		}
+		delete(s.sessions, hash)
+	}
+	return nil
+}
+
 func (s *Store) PurgeExpiredCaptchas(_ context.Context, before time.Time) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

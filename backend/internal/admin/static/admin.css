@@ -225,3 +225,28 @@ button { font: inherit; cursor: pointer; border-radius: var(--radius); }
 /* TOTP 绑定 */
 .qr { display: block; margin: 12px 0; border: 1px solid var(--rule); border-radius: var(--radius); background: #fff; padding: 8px; }
 .secret { background: #FAFAF7; border: 1px solid var(--rule); border-radius: var(--radius); padding: 8px 10px; user-select: all; }
+
+/* 进度条宽度：CSP 禁内联 style，改用预生成类（每 5% 一档） */
+.bar > span.fill { width: 0; }
+.bar > span.pct-0 { width: 0%; }
+.bar > span.pct-5 { width: 5%; }
+.bar > span.pct-10 { width: 10%; }
+.bar > span.pct-15 { width: 15%; }
+.bar > span.pct-20 { width: 20%; }
+.bar > span.pct-25 { width: 25%; }
+.bar > span.pct-30 { width: 30%; }
+.bar > span.pct-35 { width: 35%; }
+.bar > span.pct-40 { width: 40%; }
+.bar > span.pct-45 { width: 45%; }
+.bar > span.pct-50 { width: 50%; }
+.bar > span.pct-55 { width: 55%; }
+.bar > span.pct-60 { width: 60%; }
+.bar > span.pct-65 { width: 65%; }
+.bar > span.pct-70 { width: 70%; }
+.bar > span.pct-75 { width: 75%; }
+.bar > span.pct-80 { width: 80%; }
+.bar > span.pct-85 { width: 85%; }
+.bar > span.pct-90 { width: 90%; }
+.bar > span.pct-95 { width: 95%; }
+.bar > span.pct-100 { width: 100%; }
+.break-all { word-break: break-all; }

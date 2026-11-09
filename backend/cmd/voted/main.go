@@ -47,6 +47,18 @@ func main() {
 	log := logx.New(cfg.Log)
 	slog.SetDefault(log)
 
+	// 固定进程时区：管理端解析开始/结束时间用的是 time.Local，
+	// 而 MySQL 连接串里是 loc=Asia/Shanghai——两边不一致会整体偏移 8 小时。
+	if cfg.Server.Timezone != "" {
+		loc, err := time.LoadLocation(cfg.Server.Timezone)
+		if err != nil {
+			log.Error("时区无效", "tz", cfg.Server.Timezone, "err", err)
+			os.Exit(1)
+		}
+		time.Local = loc
+		log.Info("已固定进程时区", "tz", cfg.Server.Timezone)
+	}
+
 	st, err := openStore(cfg, log)
 	if err != nil {
 		log.Error("初始化存储失败", "err", err)
@@ -135,6 +147,29 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// 过期数据清理：每打开一次投票页就插一行 captchas，不清会无限增长。
+	go func() {
+		t := time.NewTicker(10 * time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-t.C:
+				if n, err := st.PurgeExpiredCaptchas(ctx, now.Add(-time.Hour)); err != nil {
+					log.Warn("清理过期验证码失败", "err", err)
+				} else if n > 0 {
+					log.Info("清理过期验证码", "rows", n)
+				}
+				if n, err := st.DeleteExpiredSessions(ctx, now); err != nil {
+					log.Warn("清理过期会话失败", "err", err)
+				} else if n > 0 {
+					log.Info("清理过期会话", "rows", n)
+				}
+			}
+		}
+	}()
 
 	if cfg.IsProduction() {
 		if strings.Contains(cfg.Security.RPCSecret, "CHANGE_ME") {

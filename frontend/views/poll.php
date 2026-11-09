@@ -122,19 +122,22 @@ $resultsVisible = !empty($poll['results_visible']);
             <?php elseif ($type === 'rank'): ?>
               <p class="q-note"><?= e(t('poll.rank_hint')) ?></p>
               <?php
-                $byId = [];
-                foreach ($options as $opt) { $byId[(int)$opt['id']] = (string)$opt['label']; }
+                // $labels 是完整映射，$rest 只当"还没排过"的集合。
+                // 以前直接在 $byId 上 unset，重填一次所有已排序条目的名称就没了。
+                $labels = [];
+                foreach ($options as $opt) { $labels[(int)$opt['id']] = (string)$opt['label']; }
+                $rest = $labels;
                 $ordered = [];
                 foreach ($ranking as $oid) {
-                    if (isset($byId[$oid])) { $ordered[] = $oid; unset($byId[$oid]); }
+                    if (isset($rest[$oid])) { $ordered[] = $oid; unset($rest[$oid]); }
                 }
-                foreach ($byId as $oid => $label) { $ordered[] = $oid; }
+                foreach ($rest as $oid => $label) { $ordered[] = $oid; }
               ?>
               <ol class="rank" data-rank>
                 <?php foreach ($ordered as $pos => $oid): ?>
                   <li class="rank-item" data-id="<?= (int)$oid ?>">
                     <span class="rank-pos" aria-hidden="true"><?= $pos + 1 ?></span>
-                    <span class="rank-label"><?= e($byId[$oid] ?? '') ?></span>
+                    <span class="rank-label"><?= e($labels[$oid] ?? '') ?></span>
                     <span class="rank-actions">
                       <button type="button" class="btn-icon" data-move="-1" aria-label="<?= e(t('poll.rank_up')) ?>">↑</button>
                       <button type="button" class="btn-icon" data-move="1" aria-label="<?= e(t('poll.rank_down')) ?>">↓</button>
@@ -179,6 +182,10 @@ $resultsVisible = !empty($poll['results_visible']);
             <p class="notice notice-error"><?= e(t('poll.captcha_failed')) ?></p>
           <?php endif; ?>
         </section>
+
+        <noscript>
+          <p class="notice notice-error">本投票需要 JavaScript 完成人机校验（工作量证明）。请开启 JavaScript 后刷新页面，或换一个较新的浏览器。</p>
+        </noscript>
 
         <div class="actionbar">
           <div class="actionbar-inner">
