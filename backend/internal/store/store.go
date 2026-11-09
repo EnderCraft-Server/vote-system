@@ -246,6 +246,8 @@ type Store interface {
 	TouchSession(ctx context.Context, tokenHash string, at time.Time) error
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteExpiredSessions(ctx context.Context, before time.Time) (int64, error)
+	// DeleteSessionsByAdmin 吊销某管理员的会话（keepTokenHash 为空表示全部吊销）。
+	DeleteSessionsByAdmin(ctx context.Context, adminID int64, keepTokenHash string) error
 
 	// 审计
 	AddAudit(ctx context.Context, e *AuditEntry) error

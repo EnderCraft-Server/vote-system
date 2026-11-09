@@ -40,11 +40,19 @@ final class Csrf
 
     private static function secret(): string
     {
-        $secret = (string)Bootstrap::cfg('security.csrf_secret', '');
-        if (strlen($secret) < 32) {
-            // 没配置就随机生成一个"进程内"密钥：令牌立刻失效，但绝不会退回弱密钥。
-            $secret = hash('sha256', __FILE__ . PHP_VERSION . 'csrf-fallback');
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
         }
-        return $secret;
+        $secret = (string)Bootstrap::cfg('security.csrf_secret', '');
+        $weak = strlen($secret) < 32 || str_contains($secret, 'CHANGE_ME');
+        if (!$weak) {
+            return $cached = $secret;
+        }
+        // 绝不能退回"可复算的常量"——那等于没有 CSRF 保护。
+        // 退而求其次：本进程随机生成，重启即失效，并明确告警。
+        $cached = bin2hex(random_bytes(32));
+        error_log('vote: security.csrf_secret 未配置或仍是 CHANGE_ME，已改用本进程随机密钥（重启后所有表单令牌失效）');
+        return $cached;
     }
 }

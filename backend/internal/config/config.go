@@ -43,11 +43,14 @@ type Server struct {
 	RPCListen         string   `yaml:"rpc_listen"`
 	AdminListen       string   `yaml:"admin_listen"`
 	AdminAllowedCIDRs []string `yaml:"admin_allowed_cidrs"`
-	ReadTimeout       Duration `yaml:"read_timeout"`
-	WriteTimeout      Duration `yaml:"write_timeout"`
-	IdleTimeout       Duration `yaml:"idle_timeout"`
-	MaxConnections    int      `yaml:"max_connections"`
-	MaxFrameBytes     int      `yaml:"max_frame_bytes"`
+	// Timezone 固定进程时区：管理员填的"10:00"按它解析、也按它落库；
+	// 留空则用系统时区（Linux 默认 UTC，容易和 DSN 里的 loc 打架）。
+	Timezone       string   `yaml:"timezone"`
+	ReadTimeout    Duration `yaml:"read_timeout"`
+	WriteTimeout   Duration `yaml:"write_timeout"`
+	IdleTimeout    Duration `yaml:"idle_timeout"`
+	MaxConnections int      `yaml:"max_connections"`
+	MaxFrameBytes  int      `yaml:"max_frame_bytes"`
 }
 
 type Database struct {
@@ -149,6 +152,7 @@ func Default() *Config {
 		Server: Server{
 			RPCListen:      "127.0.0.1:7788",
 			AdminListen:    "127.0.0.1:7789",
+			Timezone:       "Asia/Shanghai",
 			ReadTimeout:    Duration{15 * time.Second},
 			WriteTimeout:   Duration{15 * time.Second},
 			IdleTimeout:    Duration{60 * time.Second},
@@ -318,6 +322,21 @@ func (c *Config) Validate() error {
 		}
 		if c.Captcha.Pow.EscalateEvery < 1 {
 			add("captcha.pow.escalate_every 至少为 1")
+		}
+	}
+	// 管理界面监听全部地址又没配白名单 = 后台直接暴露，只剩密码一道防线。
+	if c.IsProduction() && len(c.Server.AdminAllowedCIDRs) == 0 {
+		host := c.Server.AdminListen
+		if i := strings.LastIndex(host, ":"); i > 0 {
+			host = host[:i]
+		}
+		if host == "" || host == "0.0.0.0" || host == "::" || host == "[::]" {
+			add("admin_listen 监听全部地址时，admin_allowed_cidrs 不能为空（否则管理界面暴露在公网）")
+		}
+	}
+	if c.Server.Timezone != "" {
+		if _, err := time.LoadLocation(c.Server.Timezone); err != nil {
+			add("server.timezone 不是合法时区：" + c.Server.Timezone)
 		}
 	}
 	if c.Risk.Window.Duration <= 0 {

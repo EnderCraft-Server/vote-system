@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"html/template"
+	"math"
 	"net/http"
 	"net/netip"
 	"sort"
@@ -67,11 +68,17 @@ func ruleCIDR(r store.IPRule) string {
 	if !ok {
 		return "?"
 	}
+	// 库里存的是 16 字节形式（IPv4 是 ::ffff:a.b.c.d），prefix_len 也按 16 字节算；
+	// 显示前必须 Unmap 回 4 字节，否则掩码长度和地址族对不上，1.2.3.0/24 会显示成 ::/24。
 	bits := int(r.PrefixLen)
-	if addr.Is4In6() {
+	addr = addr.Unmap()
+	if addr.Is4() {
 		bits -= 96
 		if bits < 0 {
 			bits = 0
+		}
+		if bits > 32 {
+			bits = 32
 		}
 	}
 	return netip.PrefixFrom(addr, bits).String()
@@ -97,6 +104,17 @@ func parseTemplates() (*template.Template, error) {
 			return t.Format("2006-01-02T15:04")
 		},
 		"percent": func(f float64) string { return strconv.FormatFloat(f, 'f', 1, 64) },
+		// pct5 把百分比量化到 5% 一档：CSP 禁内联 style，条形图宽度只能用预生成类。
+		"pct5": func(f float64) int {
+			n := int(math.Round(f/5)) * 5
+			if n < 0 {
+				n = 0
+			}
+			if n > 100 {
+				n = 100
+			}
+			return n
+		},
 		"fmtRank": func(f float64) string { return strconv.FormatFloat(f, 'f', 2, 64) },
 		"add":     func(a, b int) int { return a + b },
 		"seq": func(n int) []int {
@@ -232,8 +250,14 @@ func parseQuestions(f map[string][]string) ([]store.QuestionInput, []string) {
 
 	for pos, idx := range ordered {
 		prefix := "q" + strconv.Itoa(idx) + "_"
+		// 手工构造的请求可能只有 q0_title 没有 q0_type，直接下标会 panic。
+		types := f[prefix+"type"]
+		if len(types) == 0 || strings.TrimSpace(types[0]) == "" {
+			problems = append(problems, "第 "+strconv.Itoa(pos+1)+" 题缺少题型")
+			continue
+		}
 		q := store.QuestionInput{
-			Type:     f[prefix+"type"][0],
+			Type:     types[0],
 			Title:    strings.TrimSpace(first(f[prefix+"title"])),
 			Hint:     strings.TrimSpace(first(f[prefix+"hint"])),
 			Required: first(f[prefix+"required"]) != "",

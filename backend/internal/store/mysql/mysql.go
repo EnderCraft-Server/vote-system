@@ -280,8 +280,13 @@ func (s *Store) InsertVote(ctx context.Context, v *store.Vote, answers []store.A
 	res, err := tx.ExecContext(ctx, "INSERT INTO votes (poll_id, ip, ip_key, ip_text, ua_hash, receipt) VALUES (?, ?, ?, ?, ?, ?)",
 		v.PollID, v.IP, ipKey, v.IPText, v.UAHash, v.Receipt)
 	if err != nil {
-		if msg, dup := isDup(err); dup {
-			if strings.Contains(msg, "uk_votes_poll_ipkey") {
+		if _, dup := isDup(err); dup {
+			// 不依赖索引名字：直接看这个 (poll_id, ip_key) 是否已经存在。
+			// 迁移改过索引名，靠字符串匹配会把 already_voted 误判成 receipt 冲突。
+			var exists int
+			rowErr := tx.QueryRowContext(ctx,
+				"SELECT 1 FROM votes WHERE poll_id = ? AND ip_key = ? LIMIT 1", v.PollID, ipKey).Scan(&exists)
+			if rowErr == nil && exists == 1 {
 				return store.ErrDuplicateVote
 			}
 			return store.ErrConflict
@@ -488,6 +493,15 @@ func (s *Store) ConsumeCaptcha(ctx context.Context, id string, at time.Time) (bo
 		return false, err
 	}
 	return n == 1, nil
+}
+
+func (s *Store) DeleteSessionsByAdmin(ctx context.Context, adminID int64, keepTokenHash string) error {
+	if keepTokenHash == "" {
+		_, err := s.db.ExecContext(ctx, "DELETE FROM admin_sessions WHERE admin_id = ?", adminID)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "DELETE FROM admin_sessions WHERE admin_id = ? AND token_hash <> ?", adminID, keepTokenHash)
+	return err
 }
 
 func (s *Store) PurgeExpiredCaptchas(ctx context.Context, before time.Time) (int64, error) {

@@ -213,6 +213,10 @@ func (c *Console) resetPassword(ctx context.Context, username string) error {
 	if err := c.st.UpdateAdminPassword(ctx, admin.ID, string(hash)); err != nil {
 		return err
 	}
+	// 重置密码后旧会话必须失效。
+	if err := c.st.DeleteSessionsByAdmin(ctx, admin.ID, ""); err != nil {
+		c.log.Warn("吊销旧会话失败", "err", err, "username", username)
+	}
 	_ = c.st.AddAudit(ctx, &store.AuditEntry{
 		Actor: "console", Action: "password_reset", Target: "admin:" + username,
 		IPText: "local", Detail: "后台控制台重置",

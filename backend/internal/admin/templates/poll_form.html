@@ -72,7 +72,7 @@
   <section class="card danger-zone">
     <h2>危险操作</h2>
     <p class="muted">删除不可恢复；已有投票记录的投票会被拒绝删除。</p>
-    <form method="post" action="/polls/{{.Poll.ID}}/delete" onsubmit="return confirm('确定删除这个投票吗？');">
+    <form method="post" action="/polls/{{.Poll.ID}}/delete" data-confirm="确定删除这个投票吗？">
       <input type="hidden" name="csrf" value="{{$.CSRF}}">
       <button type="submit" class="btn-danger">删除投票</button>
     </form>

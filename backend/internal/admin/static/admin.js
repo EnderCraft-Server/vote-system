@@ -36,13 +36,30 @@
     return wrap;
   }
 
+  // 只读态必须用 readOnly 而不是 disabled：disabled 的控件不会随表单提交，
+  // 服务端会解析出 0 道题，于是"已有票的投票"连标题都保存不了。
+  // select / checkbox 不支持 readOnly，只能禁用 + 用一个同名 hidden 顶替。
   function input(name, type, value) {
     var i = document.createElement("input");
     i.type = type;
     i.name = name;
     if (value !== undefined && value !== null) i.value = value;
-    if (readonly) i.disabled = true;
+    if (!readonly) return i;
+    if (type === "checkbox") {
+      i.disabled = true;
+      i.checked = false; // 由调用方决定，见 mirrorCheckbox
+      return i;
+    }
+    i.readOnly = true;
     return i;
+  }
+
+  function mirror(name, value) {
+    var h = document.createElement("input");
+    h.type = "hidden";
+    h.name = name;
+    h.value = value;
+    return h;
   }
 
   function renumber() {
@@ -61,7 +78,10 @@
     required.type = "checkbox";
     required.name = "q" + idx + "_required";
     required.checked = q ? !!q.required : true;
-    if (readonly) required.disabled = true;
+    if (readonly) {
+      required.disabled = true;
+      if (required.checked) box.appendChild(mirror("q" + idx + "_required", "on"));
+    }
     var requiredLabel = el("label", "check");
     requiredLabel.appendChild(required);
     requiredLabel.appendChild(document.createTextNode(" 必答"));
@@ -163,6 +183,9 @@
     var title = input("q" + idx + "_title", "text", q ? q.title : "");
     title.placeholder = "题干";
     top.appendChild(labeled("题干", title));
+    if (readonly) {
+      top.appendChild(mirror("q" + idx + "_type", q && q.type ? q.type : "single"));
+    }
     fieldset.appendChild(top);
 
     fieldset.appendChild(labeled("提示（可选）", input("q" + idx + "_hint", "text", q ? q.hint : "")));
@@ -179,6 +202,19 @@
     host.appendChild(fieldset);
     return fieldset;
   }
+
+  // CSP 里没有 unsafe-inline，模板上的 onsubmit="confirm(...)" 会被浏览器拦掉，
+  // 结果是"删除管理员/删除投票"点下去直接提交。统一改成 data-confirm + 委托。
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form || !form.getAttribute) return;
+    var msg = form.getAttribute("data-confirm");
+    if (!msg) return;
+    if (!window.confirm(msg)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
 
   var addBtn = document.querySelector("[data-add-question]");
   if (addBtn) {

@@ -886,7 +886,15 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "保存失败", http.StatusInternalServerError)
 		return
 	}
-	s.audit(r, "password_change", "admin:"+strconv.FormatInt(admin.ID, 10), "")
+	// 改密即吊销其它会话：密码泄露后改密才有意义；当前会话留着，免得自己被踢下线。
+	keep := ""
+	if sess, _, err := s.currentSession(r); err == nil && sess != nil {
+		keep = sess.TokenHash
+	}
+	if err := s.st.DeleteSessionsByAdmin(r.Context(), admin.ID, keep); err != nil {
+		s.log.Warn("吊销旧会话失败", "err", err, "admin", admin.Username)
+	}
+	s.audit(r, "password_change", "admin:"+strconv.FormatInt(admin.ID, 10), "已吊销其它会话")
 	s.flashRedirect(w, r, "/account", "密码已更新")
 }
 

@@ -45,7 +45,7 @@
       {{range .Options}}
         <div class="bar-row">
           <span class="bar-label">{{.Label}}</span>
-          <div class="bar"><span style="width: {{percent .Percent}}%"></span></div>
+          <div class="bar"><span class="fill pct-{{pct5 .Percent}}"></span></div>
           <span class="bar-num">{{.Count}} · {{percent .Percent}}%</span>
         </div>
       {{end}}

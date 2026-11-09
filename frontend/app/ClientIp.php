@@ -21,9 +21,21 @@ final class ClientIp
         if ($raw === '') {
             return self::normalize($remote);
         }
-        // 多个值时取第一个（最靠近客户端），并再校验一次格式
-        $first = trim(explode(',', $raw)[0]);
-        return self::normalize($first);
+        // 从右往左走：追加型代理（$proxy_add_x_forwarded_for）会把客户端自己填的
+        // X-Forwarded-For 留在左边，取第一个就等于让攻击者伪造 IP。
+        // 右边第一个"不属于可信代理"的地址，才是真正连到我们前面的那一跳。
+        $parts = explode(',', $raw);
+        for ($i = count($parts) - 1; $i >= 0; $i--) {
+            $cand = trim($parts[$i]);
+            if (filter_var($cand, FILTER_VALIDATE_IP) === false) {
+                continue;
+            }
+            if (self::inRanges($cand, $trusted)) {
+                continue;
+            }
+            return self::normalize($cand);
+        }
+        return self::normalize($remote);
     }
 
     private static function normalize(string $ip): string

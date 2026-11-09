@@ -35,7 +35,7 @@
             <input type="hidden" name="csrf" value="{{$.CSRF}}">
             <button type="submit" class="btn-quiet">{{if .Active}}停用{{else}}启用{{end}}</button>
           </form>
-          <form method="post" action="/admins/{{.ID}}/delete" class="inline" onsubmit="return confirm('确定删除该管理员？');">
+          <form method="post" action="/admins/{{.ID}}/delete" class="inline" data-confirm="确定删除该管理员？">
             <input type="hidden" name="csrf" value="{{$.CSRF}}">
             <button type="submit" class="btn-quiet">删除</button>
           </form>
